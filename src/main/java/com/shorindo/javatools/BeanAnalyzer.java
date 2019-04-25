@@ -93,20 +93,20 @@ public class BeanAnalyzer {
     }
 
     public void showErrors() {
-        LOG.warn("DUPLICATED NAME:");
+        System.out.println("DUPLICATED NAME:");
         for (Entry<String,List<BeanAnalyzer.BeanDefinition>> entry : nameMap.entrySet()) {
             if (entry.getValue().size() > 1) {
                 for (BeanDefinition def : entry.getValue()) {
-                    LOG.warn(def.toString());
+                    System.out.println(def.toString());
                 }
             }
         }
 
-        LOG.warn("DUPLICATED TYPE:");
+        System.out.println("DUPLICATED TYPE:");
         for (Entry<String,List<BeanAnalyzer.BeanDefinition>> entry : typeMap.entrySet()) {
             if (entry.getValue().size() > 1) {
                 for (BeanDefinition def : entry.getValue()) {
-                    LOG.warn(def.toString());
+                    System.out.println(def.toString());
                 }
             }
         }
