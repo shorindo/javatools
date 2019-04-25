@@ -20,11 +20,14 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.logging.log4j.LogManager;
+
 /**
  * 
  */
 public class Logger {
     private static Map<Class<?>, Logger> loggerMap = new HashMap<>();
+    private org.apache.logging.log4j.Logger LOG;
     private Class<?> clazz;
     private String clazzName;
     private Level level;
@@ -39,6 +42,7 @@ public class Logger {
     }
 
     private Logger(Class<?> clazz) {
+        LOG = LogManager.getLogger(clazz);
         this.clazz = clazz;
         this.clazzName = clazz.getSimpleName();
     }
@@ -76,23 +80,35 @@ public class Logger {
     }
 
     public void log(Level level, String message) {
-        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
-        String now = format.format(new Date());
-        System.out.println(now + " [" + level.name() + "] " + clazzName + " - "+ message);
+        LOG.log(level.getLevel(), message);
+        //SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+        //String now = format.format(new Date());
+        //System.out.println(now + " [" + level.name() + "] " + clazzName + " - "+ message);
     }
 
     public void log(Level level, String message, Throwable t) {
-        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
-        String now = format.format(new Date());
-        System.out.println(now + " [" + level.name() + "] " + clazzName + " - "+ message);
-        if (t != null) t.printStackTrace();
+        LOG.log(level.getLevel(), message, t);
+        //SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+        //String now = format.format(new Date());
+        //System.out.println(now + " [" + level.name() + "] " + clazzName + " - "+ message);
+        //if (t != null) t.printStackTrace();
     }
 
     public static enum Level {
-        TRACE,
-        DEBUG,
-        INFO,
-        WARN,
-        ERROR;
+        TRACE(org.apache.logging.log4j.Level.TRACE),
+        DEBUG(org.apache.logging.log4j.Level.DEBUG),
+        INFO(org.apache.logging.log4j.Level.INFO),
+        WARN(org.apache.logging.log4j.Level.WARN),
+        ERROR(org.apache.logging.log4j.Level.ERROR);
+        
+        private org.apache.logging.log4j.Level log4jLevel;
+        
+        private Level(org.apache.logging.log4j.Level log4jLevel) {
+            this.log4jLevel = log4jLevel;
+        }
+
+        public org.apache.logging.log4j.Level getLevel() {
+            return log4jLevel;
+        }
     }
 }
