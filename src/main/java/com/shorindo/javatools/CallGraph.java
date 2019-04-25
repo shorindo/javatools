@@ -18,11 +18,15 @@ package com.shorindo.javatools;
 import java.io.File;
 import java.io.IOException;
 import java.util.Enumeration;
+import java.util.Map.Entry;
+import java.util.Properties;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
+import org.apache.bcel.classfile.AnnotationEntry;
 import org.apache.bcel.classfile.ClassParser;
 import org.apache.bcel.classfile.JavaClass;
+import org.apache.bcel.classfile.Method;
 
 /**
  * 
@@ -30,8 +34,12 @@ import org.apache.bcel.classfile.JavaClass;
 public class CallGraph {
 
     public static void main(String[] args) {
+        for (Entry entry : System.getProperties().entrySet()) {
+            System.out.println(entry.getKey() + " = " + entry.getValue());
+        }
+        
         CallGraph graph = new CallGraph();
-        graph.create(args);
+        //graph.create(args);
     }
 
     private CallGraph() {
@@ -45,9 +53,7 @@ public class CallGraph {
 
     private void walkFile(File file) {
         String name = file.getName().toLowerCase();
-        if (!file.exists()) {
-            // TODO error
-        } else if (file.isDirectory()) {
+        if (file.isDirectory()) {
             for (File child : file.listFiles()) {
                 walkFile(child);
             }
@@ -92,6 +98,11 @@ public class CallGraph {
             javaClass.getModifiers();
             javaClass.getSuperclassName();
             System.out.println("class " + javaClass.getClassName());
+            for (Method method : javaClass.getMethods()) {
+                for (AnnotationEntry ae : method.getAnnotationEntries()) {
+                    System.out.println(ae.getAnnotationType());
+                }
+            }
         } catch (IOException e) {
             
         }
