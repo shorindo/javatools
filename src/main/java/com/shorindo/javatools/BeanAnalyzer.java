@@ -45,6 +45,10 @@ public class BeanAnalyzer {
 
     /**
      * 指定したクラスファイルを解析し、Bean定義を抽出する
+     *
+     * - Bean定義は、org.springframework.context.annotation.Beanアノテーションを
+     *   付与されたメソッドを対象とする。
+     * - name属性がある場合はその値、ない場合はメソッド名をBean名として用いる
      * 
      * @param classFile クラスファイル
      */

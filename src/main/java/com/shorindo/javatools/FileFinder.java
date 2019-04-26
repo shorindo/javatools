@@ -19,29 +19,46 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 /**
- * 
+ * ファイルシステムを走査し、ファイルを見つける
  */
 public class FileFinder {
     private static final Logger LOG = Logger.getLogger(FileFinder.class);
     private FileVisitor visitor;
 
+    /**
+     * 
+     * @param visitor
+     */
     public FileFinder(FileVisitor visitor) {
         this.visitor = visitor;
     }
 
+    /**
+     * 
+     * @param files
+     * @return
+     */
     public List<File> find(File[] files) {
         List<File> fileList = new ArrayList<File>();
         for (File file : files) {
             fileList.addAll(find(file));
         }
+        sort(fileList);
         return fileList;
     }
 
+    /**
+     * 
+     * @param file
+     * @return
+     */
     public List<File> find(File file) {
         List<File> fileList = new ArrayList<File>();
         OUT:if (file.isFile()) {
@@ -51,12 +68,32 @@ public class FileFinder {
             fileList.add(file);
         } else if (file.isDirectory()) {
             File[] files = file.listFiles();
-            Arrays.sort(files);
+            sort(files);
             fileList.addAll(find(files));
         } else {
             LOG.warn("unknown type : " + file);
         }
+        sort(fileList);
         return fileList;
+    }
+
+    private static final int ORDER = 1;
+    private void sort(File[] files) {
+        Arrays.sort(files, new Comparator<File>() {
+            @Override
+            public int compare(File o1, File o2) {
+                return ORDER * o1.getAbsolutePath().compareTo(o2.getAbsolutePath());
+            }
+        });
+    }
+
+    private void sort(List<File> fileList) {
+        Collections.sort(fileList, new Comparator<File>() {
+            @Override
+            public int compare(File o1, File o2) {
+                return ORDER * o1.getAbsolutePath().compareTo(o2.getAbsolutePath());
+            }
+        });
     }
 
     public static void main(String[] args) {
@@ -84,4 +121,5 @@ public class FileFinder {
             LOG.error(e.getMessage(), e);
         }
     }
+    
 }
