@@ -32,7 +32,7 @@ import org.apache.bcel.classfile.Method;
 import org.apache.bcel.generic.Type;
 
 /**
- * 
+ * classファイルを読み取り、Spring frameworkのBean定義を抽出する 
  */
 public class BeanAnalyzer {
     private static final Logger LOG = Logger.getLogger(BeanAnalyzer.class);
@@ -43,6 +43,11 @@ public class BeanAnalyzer {
     public BeanAnalyzer() {
     }
 
+    /**
+     * 指定したクラスファイルを解析し、Bean定義を抽出する
+     * 
+     * @param classFile クラスファイル
+     */
     public void analyze(File classFile) {
 
         try {

@@ -16,8 +16,12 @@
 package com.shorindo.javatools;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 
@@ -46,10 +50,38 @@ public class FileFinder {
             }
             fileList.add(file);
         } else if (file.isDirectory()) {
-            fileList.addAll(find(file.listFiles()));
+            File[] files = file.listFiles();
+            Arrays.sort(files);
+            fileList.addAll(find(files));
         } else {
-            
+            LOG.warn("unknown type : " + file);
         }
         return fileList;
+    }
+
+    public static void main(String[] args) {
+        Set<File> dirSet = new HashSet<File>();
+        FileFinder finder = new FileFinder(new FileVisitor() {
+            @Override
+            public boolean visit(File file) {
+                String name = file.getName();
+                if (name.endsWith(".java")) {
+                    File parent = file.getParentFile();
+                    if (!dirSet.contains(parent)) {
+                        LOG.debug(parent.getAbsolutePath() + ":");
+                        dirSet.add(parent);
+                    }
+                    LOG.debug("\t" + name);
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+        });
+        try {
+            finder.find(new File(".").getCanonicalFile());
+        } catch (IOException e) {
+            LOG.error(e.getMessage(), e);
+        }
     }
 }

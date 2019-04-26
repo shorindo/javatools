@@ -6,6 +6,9 @@ import com.sun.javadoc.ClassDoc;
 import com.sun.javadoc.PackageDoc;
 import com.sun.javadoc.RootDoc;
 
+/**
+ * XML形式のjavadocを生成する
+ */
 public class XmlDoclet {
     public static boolean start(RootDoc rootDoc) {
         XmlDoclet ascDoclet = new XmlDoclet();
