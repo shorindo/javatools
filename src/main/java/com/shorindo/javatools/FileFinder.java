@@ -29,7 +29,7 @@ import java.util.Set;
  * ファイルシステムを走査し、ファイルを見つける
  */
 public class FileFinder {
-    private static final Logger LOG = Logger.getLogger(FileFinder.class);
+    private static final ToolsLogger LOG = ToolsLogger.getLogger(FileFinder.class);
     private FileVisitor visitor;
 
     /**

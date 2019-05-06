@@ -19,7 +19,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Enumeration;
 import java.util.Map.Entry;
-import java.util.Properties;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
@@ -29,17 +28,17 @@ import org.apache.bcel.classfile.JavaClass;
 import org.apache.bcel.classfile.Method;
 
 /**
- * 
+ * UNDER CONSTRUCTION
  */
 public class CallGraph {
 
     public static void main(String[] args) {
-        for (Entry entry : System.getProperties().entrySet()) {
+        for (Entry<Object,Object> entry : System.getProperties().entrySet()) {
             System.out.println(entry.getKey() + " = " + entry.getValue());
         }
         
         CallGraph graph = new CallGraph();
-        //graph.create(args);
+        graph.create(args);
     }
 
     private CallGraph() {

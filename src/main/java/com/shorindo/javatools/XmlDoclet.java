@@ -7,6 +7,7 @@ import com.sun.javadoc.PackageDoc;
 import com.sun.javadoc.RootDoc;
 
 /**
+ * UNDER CONSTRUCTION
  * XML形式のjavadocを生成する
  */
 public class XmlDoclet {

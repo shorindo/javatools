@@ -26,7 +26,7 @@ import org.junit.Test;
  * 
  */
 public class FileFinderTest {
-    private static Logger LOG = Logger.getLogger(FileFinderTest.class);
+    private static ToolsLogger LOG = ToolsLogger.getLogger(FileFinderTest.class);
     private static String PATH_NAME = FileFinderTest.class.getName()
             .replaceAll("\\.", "/") + ".class";
 

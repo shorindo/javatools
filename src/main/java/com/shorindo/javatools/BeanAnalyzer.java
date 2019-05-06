@@ -35,7 +35,7 @@ import org.apache.bcel.generic.Type;
  * classファイルを読み取り、Spring frameworkのBean定義を抽出する 
  */
 public class BeanAnalyzer {
-    private static final Logger LOG = Logger.getLogger(BeanAnalyzer.class);
+    private static final ToolsLogger LOG = ToolsLogger.getLogger(BeanAnalyzer.class);
     private static final String BEAN_TYPE = "Lorg/springframework/context/annotation/Bean;";
     private Map<String, List<BeanDefinition>> typeMap = new TreeMap<>();
     private Map<String, List<BeanDefinition>> nameMap = new TreeMap<>();

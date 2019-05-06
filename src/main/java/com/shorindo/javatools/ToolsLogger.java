@@ -15,36 +15,21 @@
  */
 package com.shorindo.javatools;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
-
 import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * 
  */
-public class Logger {
-    private static Map<Class<?>, Logger> loggerMap = new HashMap<>();
-    private org.apache.logging.log4j.Logger LOG;
-    private Class<?> clazz;
-    private String clazzName;
-    private Level level;
+public class ToolsLogger {
+    private Logger LOG;
 
-    public synchronized static Logger getLogger(Class<?> clazz) {
-        Logger logger = loggerMap.get(clazz);
-        if (logger == null) {
-            logger = new Logger(clazz);
-            loggerMap.put(clazz, logger);
-        }
-        return logger;
+    public synchronized static ToolsLogger getLogger(Class<?> clazz) {
+        return new ToolsLogger(LogManager.getLogger(clazz));
     }
 
-    private Logger(Class<?> clazz) {
-        LOG = LogManager.getLogger(clazz);
-        this.clazz = clazz;
-        this.clazzName = clazz.getSimpleName();
+    private ToolsLogger(Logger logger) {
+        LOG = logger;
     }
 
     public void trace(String message) {
@@ -81,17 +66,11 @@ public class Logger {
 
     public void log(Level level, String message) {
         LOG.log(level.getLevel(), message);
-        //SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
-        //String now = format.format(new Date());
-        //System.out.println(now + " [" + level.name() + "] " + clazzName + " - "+ message);
     }
 
     public void log(Level level, String message, Throwable t) {
         LOG.log(level.getLevel(), message, t);
-        //SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
-        //String now = format.format(new Date());
-        //System.out.println(now + " [" + level.name() + "] " + clazzName + " - "+ message);
-        //if (t != null) t.printStackTrace();
+
     }
 
     public static enum Level {
