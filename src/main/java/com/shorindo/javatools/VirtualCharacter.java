@@ -25,6 +25,10 @@ public class VirtualCharacter {
         this.ch = ch;
     }
 
+    public char getChar() {
+        return ch;
+    }
+
     public String toString() {
         return String.valueOf(ch);
     }

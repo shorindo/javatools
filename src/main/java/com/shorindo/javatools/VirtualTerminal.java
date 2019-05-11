@@ -43,8 +43,8 @@ public class VirtualTerminal {
      * @param cols
      */
     public void resize(int rows, int cols) {
-        this.rowSize = rows;
-        this.colSize = cols;
+        rowSize = rows;
+        colSize = cols;
         vchars = new VirtualCharacter[rows * cols];
     }
 
