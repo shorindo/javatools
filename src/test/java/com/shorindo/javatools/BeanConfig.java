@@ -37,4 +37,49 @@ public class BeanConfig {
     public Z z() {
         return null;
     }
+    
+    public @interface MyAnnot {
+
+    }
+
+    public static interface X {
+
+        @Deprecated
+        public void methodX1();
+        public void methodX2();
+
+    }
+
+    public static abstract class Y implements X {
+
+        public Y() {
+        }
+
+        @Override
+        public void methodX1() {
+        }
+
+        @Override
+        public void methodX2() {
+        }
+
+        public void methodY1() {
+        }
+
+        public void methodY2() {
+        }
+    }
+
+    public static class Z extends Y {
+
+        public Z() {
+        }
+
+        public void methodZ1() {
+        }
+
+        @MyAnnot
+        public void methodZ2() {
+        }
+    }
 }

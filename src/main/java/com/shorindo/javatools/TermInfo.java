@@ -26,7 +26,7 @@ public class TermInfo extends PEGCombinator {
     public static final String SHARP = "#";
     public static final String COMMA = ",";
     public static final String VERTICAL_BAR = "|";
-    public static final String SPACE_CLASS = "[ \\t\\b]";
+    public static final String SPACE_CLASS = " \\t";
     private BacktrackInputStream bis;
 
     /*
@@ -36,8 +36,7 @@ public class TermInfo extends PEGCombinator {
         // terminfo := line*
         rule("TERMINFO").define(
                 rule$ZeroOrMore(
-                        rule("LINE"))
-                );
+                        rule("LINE")));
         
         // line := comment | empty | start | continue
         rule("LINE").define(
@@ -45,22 +44,22 @@ public class TermInfo extends PEGCombinator {
                         rule("COMMENT"),
                         rule("EMPTY"),
                         rule("START"),
-                        rule("CONTINUE"))
-                );
+                        rule("CONTINUE")));
 
         // comment := '#' [^LF]* LF
         rule("COMMENT").define(
                 rule$Literal(SHARP),
-                rule$Not(
-                        rule$Literal(LF)),
+                rule$ZeroOrMore(
+                        rule$Class("^\n")),
                 rule$Literal(LF));
         
         // empty := LF
         rule("EMPTY").define(
                 rule$Literal(LF));
 
-        // start := definition LF
+        // start := capname definition LF
         rule("START").define(
+                rule("CAP_NAME"),
                 rule("DEFINITION"),
                 rule$Literal(LF));
 
@@ -70,32 +69,66 @@ public class TermInfo extends PEGCombinator {
                 rule("DEFINITION"),
                 rule$Literal(LF));
 
-        // definition := capname (',' capvalue)*
+        // definition := (',' / capvalue)*
         rule("DEFINITION").define(
-                rule("CAPNAME"),
                 rule$ZeroOrMore(
-                        rule$Sequence(
+                        rule$Choice(
                                 rule$Literal(COMMA),
-                                rule("CAPVALUE"))));
+                                rule("CAP_VALUE"))));
 
         // capname := capid ('|' capdesc)?
-        rule("CAPNAME").define(
-                rule("CAPID"),
+        rule("CAP_NAME").define(
+                rule("CAP_ID"),
                 rule$Optional(
                         rule$Literal(VERTICAL_BAR),
-                        rule("CAPDESC")));
+                        rule("CAP_DESC")));
 
-        // TODO
+        rule("CAP_ID").define(
+                rule$OneOrMore(
+                        rule$Class("^ \t\b\r\n\\|,")));
+
+        rule("CAP_DESC").define(
+                rule$OneOrMore(
+                        rule$Class("^\n,")));
+
+        rule("CAP_VALUE").define(
+                rule$Choice(
+                        rule("VAR_NUMBER"),
+                        rule("VAR_STRING"),
+                        rule("VAR_BOOL")));
+
+        rule("VAR_NUMBER").define(
+                rule("VAR_NAME"),
+                rule$Literal("#"),
+                rule("VAR_NUMBER_VALUE").define(
+                        rule$OneOrMore(
+                                rule$Class("0-9"))));
+
+        rule("VAR_STRING").define(
+                rule("VAR_NAME"),
+                rule$Literal("="),
+                rule("VAR_STRING_VALUE").define(
+                        rule$OneOrMore(
+                                rule$Class("^,"))));
+
+        rule("VAR_BOOL").define(
+                rule("VAR_NAME"),
+                rule$Optional(
+                        rule$Literal("@")));
+
+        rule("VAR_NAME").define(
+                rule$OneOrMore(
+                        rule$Class("0-9a-zA-Z")));
 
         // ws+ ;= space+
         rule("WS+").define(
                 rule$OneOrMore(
-                        rule$Literal(SPACE_CLASS)));
+                        rule$Class(SPACE_CLASS)));
 
         // ws* ;= space+
         rule("WS*").define(
                 rule$ZeroOrMore(
-                        rule$Literal(SPACE_CLASS)));
+                        rule$Class(SPACE_CLASS)));
     }
 
     /**

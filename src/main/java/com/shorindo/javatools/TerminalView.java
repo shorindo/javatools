@@ -54,9 +54,9 @@ public class TerminalView extends WindowAdapter implements ComponentListener {
         frame.addKeyListener(new KeyListener() {
                 @Override
                 public void keyTyped(KeyEvent e) {
-                    //LOG.debug("modifier=" + e.getModifiers());
+                    LOG.debug(e.toString());
                     if (e.isControlDown()) {
-                        LOG.debug("keyChar=" + e);
+                        LOG.debug("keyCode=" + e.getKeyCode());
                         switch(e.getKeyCode()) {
                         case 'l':
                             vt.clear();
@@ -70,6 +70,19 @@ public class TerminalView extends WindowAdapter implements ComponentListener {
                 }
                 @Override
                 public void keyPressed(KeyEvent e) {
+                    LOG.debug(e.toString());
+                    if (e.isControlDown()) {
+                        //LOG.debug("keyCode=" + e.getKeyCode());
+                        switch(e.getKeyCode()) {
+                        case 76:
+                            vt.clear();
+                            break;
+                        default:
+                        }
+                    } else {
+                        vt.addChar(e.getKeyChar());
+                    }
+                    frame.repaint();
                 }
                 @Override
                 public void keyReleased(KeyEvent e) {

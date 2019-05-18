@@ -28,6 +28,7 @@ import java.util.regex.Pattern;
  * PEGによる構文解析器を生成する
  */
 public class PEGCombinator {
+    private static final ToolsLogger LOG = ToolsLogger.getLogger(PEGCombinator.class);
     private static final UnmatchException UNMATCH = new UnmatchException();
     private Map<String,Rule> ruleMap;
 
@@ -38,13 +39,9 @@ public class PEGCombinator {
         ruleMap = new HashMap<String,Rule>();
     }
 
-    private static void trace(String msg) {
-        System.out.println("[TRACE] " + msg);
-    }
-
     protected Rule rule(final String ruleName) {
         if (!ruleMap.containsKey(ruleName)) {
-            ruleMap.put(ruleName, new Rule() {
+            ruleMap.put(ruleName, new Rule(ruleName) {
                 @Override
                 public Node accept(BacktrackInputStream is) throws IOException,
                         UnmatchException {
@@ -53,7 +50,7 @@ public class PEGCombinator {
                     for (Rule rule : childRules) {
                         $$.add(rule.accept(is));
                     }
-                    trace("rule[" + ruleName + "]");
+                    LOG.debug("rule[" + ruleName + "] : accept");
                     return $$;
                 }
             });
@@ -62,14 +59,14 @@ public class PEGCombinator {
     }
 
     protected Rule rule$Any() {
-        return new Rule() {
+        return new Rule("rule$Any") {
             @Override
             public Node accept(BacktrackInputStream is) throws IOException, UnmatchException {
                 int c = is.read();
                 if (c == -1) {
                     throw UNMATCH;
                 } else {
-                    trace("rule$any() <= " + (char)c);
+                    LOG.trace("rule$Any() : accept <= " + (char)c);
                     Node $$ = new Node("any");
                     $$.setValue((char)c);
                     return $$;
@@ -78,37 +75,39 @@ public class PEGCombinator {
         };
     }
 
-    protected Rule rule$Not(final Rule rule) {
-        return new Rule() {
-            @Override
-            public Node accept(BacktrackInputStream is) throws IOException, UnmatchException {
-                int pos = is.position();
-                try {
-                    rule.accept(is);
-                } catch (UnmatchException e) {
-                    trace("rule$not() <= " + rule);
-                    return new Node("not");
-                }
-                is.reset(pos);
-                throw UNMATCH;
-            }
-        };
-    }
+// FIXME 子ルールが不一致のとき、入力が巻き戻されてしまう
+//    protected Rule rule$Not(final Rule rule) {
+//        return new Rule("rule$Not") {
+//            @Override
+//            public Node accept(BacktrackInputStream is) throws IOException, UnmatchException {
+//                int pos = is.position();
+//                try {
+//                    rule.accept(is);
+//                } catch (UnmatchException e) {
+//                    LOG.debug("rule$Not() <= " + rule);
+//                    return new Node("not");
+//                }
+//                is.reset(pos);
+//                throw UNMATCH;
+//            }
+//        };
+//    }
 
     protected Rule rule$Literal(final String literal) {
-        return new Rule() {
+        return new Rule("rule$Literal") {
             @Override
             public Node accept(BacktrackInputStream is) throws IOException, UnmatchException {
                 int mark = is.position();
                 for (int i = 0; i < literal.length(); i++) {
                     char c = literal.charAt(i);
                     int r = is.read();
+                    LOG.debug("rule$Literal('" + format(literal) + "') <= " + (char)r);
                     if (c != r) {
                         is.reset(mark);
                         throw UNMATCH;
                     }
                 }
-                trace("rule$literal() <= " + literal);
+                LOG.debug("rule$Literal('" + format(literal) + "') : accept");
                 Node $$ = new Node("literal");
                 $$.setValue(literal);
                 return $$;
@@ -117,19 +116,22 @@ public class PEGCombinator {
     }
     
     protected Rule rule$Class(final String charClass) {
-        return new Rule() {
-            Pattern pattern = Pattern.compile(charClass);
+        return new Rule("rule$Class") {
+            Pattern pattern = Pattern.compile("[" + charClass + "]");
 
             @Override
             public Node accept(BacktrackInputStream is) throws IOException,
                     UnmatchException {
                 int curr = is.position();
                 int c = is.read();
+                if (c == -1) {
+                    throw UNMATCH;
+                }
                 Matcher m = pattern.matcher(String.valueOf((char)c));
                 if (m.matches()) {
-                    trace("rule$class(" + (char)c + ") <= " + charClass);
                     Node $$ = new Node("class");
-                    $$.setValue(c);
+                    $$.setValue((char)c);
+                    LOG.debug("rule$Class('" + format(charClass) + "') : accept <= " + (char)c);
                     return $$;
                 } else {
                     is.reset(curr);
@@ -139,7 +141,7 @@ public class PEGCombinator {
         };
     }
     protected Rule rule$ZeroOrMore(final Rule...rules) {
-        return new Rule() {
+        return new Rule("rule$ZeroOrMore") {
             @Override
             public Node accept(BacktrackInputStream is) throws IOException,
                     UnmatchException {
@@ -155,13 +157,13 @@ public class PEGCombinator {
                         break;
                     }
                 }
-                trace("rule$zeroOrMore <= " + toString(rules));
+                LOG.trace("rule$ZeroOrMore[" + toString(rules) + "] : accept");
                 return $$;
             }
         };
     }
     protected Rule rule$OneOrMore(final Rule...rules) {
-        return new Rule() {
+        return new Rule("rule$OneOrMore") {
             @Override
             public Node accept(BacktrackInputStream is) throws IOException,
                     UnmatchException {
@@ -180,7 +182,7 @@ public class PEGCombinator {
                     }
                 }
                 if (count > 0) {
-                    trace("rule$zeroOrMore <= " + toString(rules));
+                    LOG.trace("rule$ZeroOrMore[" + toString(rules) + " : accept");
                     return $$;
                 } else {
                     throw UNMATCH;
@@ -189,11 +191,11 @@ public class PEGCombinator {
         };
     }
     protected Rule rule$Sequence(final Rule...rules) {
-        return new Rule() {
+        return new Rule("rule$Sequence") {
             @Override
             public Node accept(BacktrackInputStream is) throws IOException,
                     UnmatchException {
-                //trace(toString());
+                //LOG.trace(toString());
                 int curr = is.position();
                 Node $$ = new Node("sequence");
                 try {
@@ -205,22 +207,22 @@ public class PEGCombinator {
                     is.reset(curr);
                     throw e;
                 }
-                trace("rule$sequence <= " + toString(rules));
+                LOG.trace("rule$Sequence <= " + toString(rules));
                 return $$;
             }
         };
     }
     
     protected Rule rule$Choice(final Rule...rules) {
-        return new Rule() {
+        return new Rule("rule$Choice") {
             @Override
             public Node accept(BacktrackInputStream is) throws IOException,
                     UnmatchException {
-                //trace(toString());
+                //LOG.trace(toString());
                 int curr = is.position();
                 for (Rule child : rules) {
                     try {
-                        trace("rule$choice <= " + toString(rules));
+                        LOG.debug("rule$Choice(" + toString(child) + ")");
                         return child.accept(is);
                     } catch (UnmatchException e) {
                         is.reset(curr);
@@ -232,13 +234,13 @@ public class PEGCombinator {
     }
 
     protected Rule rule$Optional(final Rule...rules) {
-        return new Rule() {
+        return new Rule("rule$Optional") {
             @Override
             public Node accept(BacktrackInputStream is) throws IOException,
                     UnmatchException {
-                for (Rule child : rules) {
-                    childRules.add(child);
-                }
+//                for (Rule child : rules) {
+//                    childRules.add(child);
+//                }
 
                 int curr = is.position();
                 Node $$ = new Node("optional");
@@ -246,7 +248,7 @@ public class PEGCombinator {
                     for (Rule child : rules) {
                         $$.add(child.accept(is));
                     }
-                    trace("rule$optional() <= " + toString(rules));
+                    LOG.trace("rule$Optional() <= " + toString(rules));
                 } catch (UnmatchException e) {
                     $$.clear();
                     is.reset(curr);
@@ -254,6 +256,15 @@ public class PEGCombinator {
                 return $$;
             }
         };
+    }
+
+    protected String format(String s) {
+        return s
+                .replaceAll("\\\\", "\\\\")
+                .replaceAll("\r", "\\\\r")
+                .replaceAll("\n", "\\\\n")
+                .replaceAll("\t", "\\\\t");
+        
     }
 
     @SuppressWarnings("serial")
@@ -267,10 +278,15 @@ public class PEGCombinator {
      * 
      */
     public static abstract class Rule {
+        protected String ruleName;
         protected List<Rule> childRules = new ArrayList<Rule>();
 
         public abstract Node accept(BacktrackInputStream is)
                 throws IOException, UnmatchException;
+
+        public Rule(String ruleName) {
+            this.ruleName = ruleName;
+        }
 
         public Rule define(Rule...rules) {
             for (Rule child : rules) {
@@ -284,7 +300,7 @@ public class PEGCombinator {
         }
 
         public String toString(Rule...rules) {
-            StringBuffer sb = new StringBuffer();
+            StringBuffer sb = new StringBuffer(this.ruleName);
             String sep = "";
             sb.append("[");
             for (Rule rule : rules) {
@@ -341,6 +357,16 @@ public class PEGCombinator {
         }
         public void clear() {
             childList.clear();
+        }
+        public String getSource() {
+            StringBuilder sb = new StringBuilder();
+            if (value != null) {
+                sb.append(String.valueOf(getValue()));
+            }
+            for (Node child : childList) {
+                sb.append(child.getSource());
+            }
+            return sb.toString();
         }
         public String toString() {
             if (this.isEmpty()) {
