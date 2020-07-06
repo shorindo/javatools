@@ -15,6 +15,14 @@
  */
 package com.shorindo.javatools;
 
+import java.awt.Font;
+import java.awt.Frame;
+import java.awt.TextArea;
+import java.awt.TextField;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -25,228 +33,175 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.swing.BoxLayout;
+
 import org.mozilla.javascript.tools.shell.Main;
 
-import javafx.application.Application;
-import javafx.collections.ObservableList;
-import javafx.collections.FXCollections;
-import javafx.geometry.Pos;
-import javafx.geometry.Insets;
-import javafx.scene.Scene;
-import javafx.scene.control.ListView;
-import javafx.scene.control.ListCell;
-import javafx.scene.control.TextField;
-import javafx.scene.layout.Border;
-import javafx.scene.layout.Background;
-import javafx.scene.layout.VBox;
-import javafx.stage.Stage;
-import javafx.concurrent.Task;
-import javafx.application.Platform;
-import javafx.util.Callback;
+/**
+ * 
+ */
+public class RhinoShell extends WindowAdapter {
+    private static final String PROMPT = "rhino> ";
+    private TextArea textArea;
+    private TextField textField;
+    private InputStream in;
+    private PrintStream out;
+    private PipedOutputStream pos;
 
-@SuppressWarnings("restriction")
-public class RhinoShell extends Application {
-    public void start(Stage stage) throws Exception {
-        Terminal terminal  = new Terminal();
-        terminal.setPrefWidth(640);
-        terminal.setPrefHeight(480);
+    public static void main(String args[]) {
+        new RhinoShell().start();
+    }
+    
+    public void start() {
         new Thread() {
             @Override
             public void run() {
-                Main.setIn(terminal.getIn());
-                Main.setOut(terminal.getOut());
-                Main.setErr(terminal.getOut());
+                Main.setIn(getIn());
+                Main.setOut(getOut());
+                Main.setErr(getOut());
                 Main.main(new String[]{});
             }
         }.start();
-        VBox vbox = new VBox();
-        vbox.getChildren().addAll(terminal);
-        vbox.setAlignment(Pos.CENTER);
-        stage.setTitle("RhinoShell");
-        stage.setWidth(640);
-        stage.setHeight(480);
-        stage.setScene(new Scene(vbox));
-        stage.show();
-    }
 
-    public static void main(String[] args) {
-        launch(args);
+        textArea = new TextArea(24, 80);
+        textArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        textField = new TextField();
+        textField.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        textField.addKeyListener(new KeyListener() {
+            private History history = new History();
+
+            @Override
+            public void keyTyped(KeyEvent e) {
+            }
+
+            @Override
+            public void keyPressed(KeyEvent e) {
+                //System.out.println(e.getKeyCode());
+                switch (e.getKeyCode()) {
+                case KeyEvent.VK_ENTER:
+                    try {
+                        history.add(textField.getText());
+                        history.last();
+                        String line = textField.getText() + "\n";
+                        textArea.append(PROMPT + line);
+                        pos.write(line.getBytes());
+                        textField.setText("");
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
+                    break;
+                case KeyEvent.VK_L:
+                    if ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0) {
+                        textArea.setText("");
+                    }
+                    break;
+                case KeyEvent.VK_U:
+                    if ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0) {
+                        textField.setText("");
+                    }
+                    break;
+                case KeyEvent.VK_UP:
+                    textField.setText(history.back(textField.getText()));
+                    textField.setCaretPosition(textField.getText().length());
+                    break;
+                case KeyEvent.VK_DOWN:
+                    textField.setText(history.forward(textField.getText()));
+                    textField.setCaretPosition(textField.getText().length());
+                    break;
+                }
+            }
+
+            @Override
+            public void keyReleased(KeyEvent e) {
+            }
+            
+        });
+        Frame frame = new Frame();
+        frame.addWindowListener(this);
+        frame.setLayout(new BoxLayout(frame, BoxLayout.Y_AXIS));
+        frame.add(textArea);
+        frame.add(textField);
+        frame.pack();
+        frame.setVisible(true);
+        textField.requestFocus();
     }
     
-    public static class Terminal extends ListView<String> {
-        private InputStream in;
-        private PrintStream out;
-        private PipedOutputStream pos;
-        private List<String> lines;
+    public void windowClosing(WindowEvent e) {
+        System.exit(0);
+    }
+    
+    public void print(String line) {
+        textArea.append(line + "\n");
+    }
+    
+    public InputStream getIn() {
+        if (in == null) {
+            try {
+                pos = new PipedOutputStream();
+                in = new PipedInputStream(pos);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        return in;
+    }
+    
+    public PrintStream getOut() {
+        if (out == null) {
+            out = new PrintStream(new OutputStream() {
+                ByteArrayOutputStream buffer = new ByteArrayOutputStream();
 
-        public Terminal() {
-            super();
-            Terminal self = this;
-            lines = new ArrayList<>();
-            lines.add("rhino> ");
-            ObservableList<String>lm = FXCollections.observableArrayList(lines);
-            setItems(lm);
-            setEditable(true);
-            setCellFactory(new Callback<ListView<String>, ListCell<String>>() {
                 @Override
-                public ListCell<String> call(ListView<String> listView) {
-                    return new EditCell(self, pos);
+                public void write(int b) throws IOException {
+                    if ( b == '\n') {
+                        String line = new String(buffer.toByteArray())
+                        .replaceAll("[\r\n]", "")
+                        .replaceAll("js> ", "");
+                        if (!"".equals(line)) {
+                            print(line);
+                        }
+                        buffer.reset();
+                    } else {
+                        buffer.write(b);
+                    }
                 }
             });
-            layout();
-            edit(getItems().size() - 1);
         }
-        
-        public void print(String line) {
-            //System.out.println("print(" + line + ")");
-            Runnable runnable = new Runnable() {
-                @Override
-                public void run() {
-                    getItems().add(getItems().size() - 1, line);
-                    scrollTo(getItems().size() - 1);
-                    layout();
-                    edit(getItems().size() - 1);
-                }
-            };
-            
-            Task<Boolean> task = new Task<Boolean>() {
-                @Override
-                protected Boolean call() throws Exception {
-                    Platform.runLater(runnable);
-                    return true;
-                }
-            };
-                 
-            Thread t = new Thread( task );
-            t.setDaemon( true );
-            t.start();
-        }
-        
-        public InputStream getIn() {
-            if (in == null) {
-                try {
-                    pos = new PipedOutputStream();
-                    in = new PipedInputStream(pos);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-            return in;
-        }
-        
-        public PrintStream getOut() {
-            if (out == null) {
-                out = new PrintStream(new OutputStream() {
-                    ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-
-                    @Override
-                    public void write(int b) throws IOException {
-                        if ( b == '\n') {
-                            String line = new String(buffer.toByteArray())
-                            .replaceAll("[\r\n]", "")
-                            .replaceAll("js> ", "");
-                            if (!"".equals(line)) {
-                                print(line);
-                            }
-                            buffer.reset();
-                        } else {
-                            buffer.write(b);
-                        }
-                    }
-                });
-            }
-            return out;
-        }
-        
-        public void reset() {
-            for (int i = getItems().size() - 2; i >= 0; i--) {
-                getItems().remove(i);
-            }
-            layout();
-            edit(0);
-        }
-        
-        public static class EditCell extends ListCell<String> {
-            private static final String PROMPT = "rhino> ";
-            private List<String> histories;
-            private TextField textField;
-            private Terminal terminal;
-            private PipedOutputStream pos;
-
-            public EditCell(Terminal terminal, PipedOutputStream pos) {
-                this.histories = new ArrayList<>();
-                this.terminal = terminal;
-                this.pos = pos;
-            }
-
-            @Override
-            public void cancelEdit() {
-                super.cancelEdit();
-                //System.out.println("cancelEdit(" + line.getText() + ")");
-                setText(getItem());
-                setGraphic(null);
-            }
-
-            @Override
-            public void commitEdit(String arg0) {
-                super.commitEdit(arg0);
-                System.out.println("commitEdit()");
-            }
-
-            @Override
-            public void startEdit() {
-                super.startEdit();
-                //System.out.println("startEdit(" + line.getText() + ")");
-
-                textField = new TextField(getItem());
-                textField.setBorder(Border.EMPTY);
-                textField.setPadding(Insets.EMPTY);
-                textField.setBackground(Background.EMPTY);
-                textField.setOnKeyPressed(e -> {
-                    switch(e.getCode()) {
-                    case L:
-                        if (e.isControlDown()) {
-                            terminal.reset();
-                        }
-                        break;
-                    case LEFT:
-                    case UP:
-                    case DOWN:
-                        break;
-                    case ENTER:
-                        try {
-                            String line = textField.getText().replaceAll("^" + PROMPT, "") + "\n";
-                            terminal.print(PROMPT + line);
-                            byte[] b = line.getBytes();
-                            pos.write(b, 0, b.length);
-                            pos.flush();
-                        } catch (Exception ex) {
-                            ex.printStackTrace();
-                        }
-                        break;
-                    default:
-                        break;
-                    }
-                });
-
-                setText(null);
-                setGraphic(textField);
-                layout();
-                textField.requestFocus();
-                textField.clear();
-                textField.setText(PROMPT);
-                textField.positionCaret(PROMPT.length());
-            }
-
-            @Override
-            protected void updateItem(String paramT, boolean paramBoolean) {
-                //System.out.println("updateItem(" + paramT + ")");
-                super.updateItem(paramT, paramBoolean);
-                setText(paramT);
-            }
-            
-        }
-
+        return out;
     }
 
+    public class History extends ArrayList<String> {
+        private static final long serialVersionUID = -8719279781968316379L;
+        private int curr = 0;
+
+        @Override
+        public boolean add(String e) {
+            boolean b = super.add(e);
+            curr = size();
+            return b;
+        }
+
+        public String back(String text) {
+            if (curr > 0) {
+                return get(--curr);
+            } else {
+                return text;
+            }
+        }
+
+        public String forward(String text) {
+            if (curr < size() - 1) {
+                return get(++curr);
+            } else if (curr == size() - 1) {
+                curr++;
+                return "";
+            } else {
+                return "";
+            }
+        }
+        
+        public void last() {
+            curr = size();
+        }
+    }
 }

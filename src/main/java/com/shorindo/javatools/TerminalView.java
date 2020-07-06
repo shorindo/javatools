@@ -33,7 +33,6 @@ import java.awt.event.WindowEvent;
  * 
  */
 public class TerminalView extends WindowAdapter implements ComponentListener {
-    @SuppressWarnings("unused")
     private static final ToolsLogger LOG = ToolsLogger.getLogger(TerminalView.class);
     private final VirtualTerminal vt = new VirtualTerminal(24, 80);
 
@@ -155,9 +154,9 @@ public class TerminalView extends WindowAdapter implements ComponentListener {
         public CustomPaintComponent(VirtualTerminal term) {
             super();
             this.term = term;
-            String seeds = "0123456789";
+            String seeds = "0123456789abcdeABCDE";
             for (int i = 0; i < 2000 - 1; i++) {
-                term.addChar(seeds.charAt(i % 10));
+                term.addChar(seeds.charAt(i % seeds.length()));
             }
         }
 

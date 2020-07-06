@@ -30,6 +30,7 @@ import org.apache.bcel.classfile.ElementValuePair;
 import org.apache.bcel.classfile.JavaClass;
 import org.apache.bcel.classfile.Method;
 import org.apache.bcel.generic.Type;
+import org.springframework.beans.factory.BeanFactory;
 
 /**
  * classファイルを読み取り、Spring frameworkのBean定義を抽出する 

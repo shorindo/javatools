@@ -6,9 +6,10 @@
         </Console>
     </Appenders>
     <Loggers>
-    <Logger name="org.apache.log4j.xml" level="info"/>
-        <Root level="info">
+    <Logger name="org.apache.log4j.xml" level="trace"/>
+        <Root level="trace">
             <AppenderRef ref="STDOUT"/>
         </Root>
     </Loggers>
+    <Logger name="org.springframework.beans.factory.support.DefaultListableBeanFactory" level="trace" />
 </Configuration>
