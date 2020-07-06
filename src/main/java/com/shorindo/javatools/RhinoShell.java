@@ -158,6 +158,14 @@ public class RhinoShell extends Application {
             return out;
         }
         
+        public void reset() {
+            for (int i = getItems().size() - 2; i >= 0; i--) {
+                getItems().remove(i);
+            }
+            layout();
+            edit(0);
+        }
+        
         public static class EditCell extends ListCell<String> {
             private static final String PROMPT = "rhino> ";
             private List<String> histories;
@@ -196,6 +204,15 @@ public class RhinoShell extends Application {
                 textField.setBackground(Background.EMPTY);
                 textField.setOnKeyPressed(e -> {
                     switch(e.getCode()) {
+                    case L:
+                        if (e.isControlDown()) {
+                            terminal.reset();
+                        }
+                        break;
+                    case LEFT:
+                    case UP:
+                    case DOWN:
+                        break;
                     case ENTER:
                         try {
                             String line = textField.getText().replaceAll("^" + PROMPT, "") + "\n";
@@ -232,117 +249,4 @@ public class RhinoShell extends Application {
 
     }
 
-//    public static class TerminalX extends VBox {
-//        private Prompt prompt;
-//        private PipedInputStream pis;
-//        private PipedOutputStream pos;
-//        
-//        public TerminalX(int size) {
-//            try {
-//                pos = new PipedOutputStream();
-//                pis = new PipedInputStream(pos);
-//            } catch (IOException e1) {
-//                // TODO Auto-generated catch block
-//                e1.printStackTrace();
-//            }
-//
-//            prompt = new Prompt(this, "rhino> ", pis, pos);
-//            getChildren().add(prompt);
-//        }
-//
-//        public void addLine(String text) {
-//            //System.out.println("addLine(" + text + ")");
-//            Runnable runnable = new Runnable() {
-//                @Override
-//                public void run() {
-//                    int index = getChildren().size() - 1;
-//                    getChildren().add(index, new Label(text));
-//                    prompt.requestFocus();
-//                }
-//            };
-//            
-//            Task<Boolean> task = new Task<Boolean>() {
-//                @Override
-//                protected Boolean call() throws Exception {
-//                    Platform.runLater(runnable);
-//                    return true;
-//                }
-//            };
-//                 
-//            Thread t = new Thread( task );
-//            t.setDaemon( true );
-//            t.start();
-//        }
-//
-//        public InputStream getIn() {
-//            return pis;
-//        }
-//
-//        public PrintStream getOut() {
-//
-//            return new PrintStream(new OutputStream() {
-//                ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-//
-//                @Override
-//                public void write(int b) throws IOException {
-//                    if ( b == '\n') {
-//                        String line = new String(buffer.toByteArray())
-//                            .replaceAll("[\r\n]", "")
-//                            .replaceAll("js> ", "");
-//                        if (!"".equals(line)) {
-//                            addLine(line.replaceAll("\n", ""));
-//                        }
-//                        buffer.reset();
-//                    } else {
-//                        buffer.write(b);
-//                    }
-//                }
-//            });
-//        }
-//    }
-//    
-//    public static class Prompt extends HBox {
-//        private Label promptLabel;
-//        private TextField readLine;
-//
-//        public Prompt(TerminalX terminal, String prompt, InputStream is, OutputStream os) {
-//            promptLabel = new Label(prompt);
-//            getChildren().add(promptLabel);
-//            readLine = new TextField();
-//            getChildren().add(readLine);
-////            Prompt.setHgrow(readLine, Priority.ALWAYS);
-//            
-//            readLine.positionCaret(7);
-//            readLine.setBorder(Border.EMPTY);
-//            readLine.setPadding(Insets.EMPTY);
-////            readLine.setBackground(Background.EMPTY);
-//            readLine.setOnKeyPressed(e -> {
-//                switch(e.getCode()) {
-//                case ENTER:
-//                    try {
-//                        String line = readLine.getText() + "\n";
-//                        terminal.addLine(prompt + line);
-//                        byte[] b = line.getBytes();
-//                        os.write(b, 0, b.length);
-//                        os.flush();
-//                        readLine.clear();
-//                        readLine.positionCaret(7);
-//                        readLine.requestFocus();
-//                    } catch (Exception e1) {
-//                        // TODO Auto-generated catch block
-//                        e1.printStackTrace();
-//                    }
-//                    break;
-//                default:
-//                    break;
-//                }
-//            });
-//        }
-//
-//        @Override
-//        public void requestFocus() {
-//            readLine.requestFocus();
-//        }
-//        
-//    }
 }
