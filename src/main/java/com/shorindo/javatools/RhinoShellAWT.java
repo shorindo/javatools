@@ -32,6 +32,8 @@ import java.io.OutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.swing.BoxLayout;
 
@@ -51,7 +53,7 @@ public class RhinoShellAWT extends WindowAdapter {
     public static void main(String args[]) {
         new RhinoShellAWT().start();
     }
-
+    
     public void start() {
         new Thread() {
             @Override
@@ -68,6 +70,7 @@ public class RhinoShellAWT extends WindowAdapter {
         textField = new TextField();
         textField.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
         textField.addKeyListener(new KeyListener() {
+            private History history = new History();
 
             @Override
             public void keyTyped(KeyEvent e) {
@@ -77,8 +80,10 @@ public class RhinoShellAWT extends WindowAdapter {
             public void keyPressed(KeyEvent e) {
                 //System.out.println(e.getKeyCode());
                 switch (e.getKeyCode()) {
-                case 10:
+                case KeyEvent.VK_ENTER:
                     try {
+                        history.add(textField.getText());
+                        history.last();
                         String line = textField.getText() + "\n";
                         textArea.append(PROMPT + line);
                         pos.write(line.getBytes());
@@ -86,6 +91,24 @@ public class RhinoShellAWT extends WindowAdapter {
                     } catch (IOException ex) {
                         ex.printStackTrace();
                     }
+                    break;
+                case KeyEvent.VK_L:
+                    if ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0) {
+                        textArea.setText("");
+                    }
+                    break;
+                case KeyEvent.VK_U:
+                    if ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0) {
+                        textField.setText("");
+                    }
+                    break;
+                case KeyEvent.VK_UP:
+                    textField.setText(history.back(textField.getText()));
+                    textField.setCaretPosition(textField.getText().length());
+                    break;
+                case KeyEvent.VK_DOWN:
+                    textField.setText(history.forward(textField.getText()));
+                    textField.setCaretPosition(textField.getText().length());
                     break;
                 }
             }
@@ -112,7 +135,7 @@ public class RhinoShellAWT extends WindowAdapter {
     public void print(String line) {
         textArea.append(line + "\n");
     }
-
+    
     public InputStream getIn() {
         if (in == null) {
             try {
@@ -149,4 +172,36 @@ public class RhinoShellAWT extends WindowAdapter {
         return out;
     }
 
+    public class History extends ArrayList<String> {
+        private int curr = 0;
+
+        @Override
+        public boolean add(String e) {
+            boolean b = super.add(e);
+            curr = size();
+            return b;
+        }
+
+        public String back(String text) {
+            if (curr > 0) {
+                return get(--curr);
+            } else {
+                return text;
+            }
+        }
+
+        public String forward(String text) {
+            if (curr < size() - 1) {
+                return get(++curr);
+            } else if (curr == size() - 1) {
+                return "";
+            } else {
+                return text;
+            }
+        }
+        
+        public void last() {
+            curr = size();
+        }
+    }
 }
