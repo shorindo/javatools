@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.shorindo.javatools;
+package com.shorindo.tools;
 
 import java.awt.Font;
 import java.awt.Frame;
@@ -31,7 +31,6 @@ import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.io.PrintStream;
 import java.util.ArrayList;
-import java.util.List;
 
 import javax.swing.BoxLayout;
 
@@ -155,8 +154,8 @@ public class RhinoShell extends WindowAdapter {
                 public void write(int b) throws IOException {
                     if ( b == '\n') {
                         String line = new String(buffer.toByteArray())
-                        .replaceAll("[\r\n]", "")
-                        .replaceAll("js> ", "");
+                            .replaceAll("[\r\n]", "")
+                            .replaceAll("js> ", "");
                         if (!"".equals(line)) {
                             print(line);
                         }
