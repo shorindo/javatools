@@ -15,6 +15,7 @@
  */
 package com.shorindo.tools;
 
+import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Frame;
 import java.awt.TextArea;
@@ -48,7 +49,11 @@ public class RhinoShell extends WindowAdapter {
     private PipedOutputStream pos;
 
     public static void main(String args[]) {
-        new RhinoShell().start();
+        if (args.length > 0) {
+            Main.main(args);
+        } else {
+            new RhinoShell().start();
+        }
     }
     
     public void start() {
@@ -64,8 +69,10 @@ public class RhinoShell extends WindowAdapter {
 
         textArea = new TextArea(24, 80);
         textArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        textArea.setEditable(false);
         textField = new TextField();
         textField.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        textField.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
         textField.addKeyListener(new KeyListener() {
             private History history = new History();
 
@@ -96,7 +103,31 @@ public class RhinoShell extends WindowAdapter {
                     break;
                 case KeyEvent.VK_U:
                     if ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0) {
+                        textField.setCaretPosition(0);
                         textField.setText("");
+                    }
+                    break;
+                case KeyEvent.VK_A:
+                    if ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0) {
+                        textField.setCaretPosition(0);
+                        e.consume();
+                    }
+                    break;
+                case KeyEvent.VK_E:
+                    if ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0) {
+                        textField.setCaretPosition(textField.getText().length());
+                    }
+                    break;
+                case KeyEvent.VK_P:
+                    if ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0) {
+                        textField.setText(history.back(textField.getText()));
+                        textField.setCaretPosition(textField.getText().length());
+                    }
+                    break;
+                case KeyEvent.VK_N:
+                    if ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0) {
+                        textField.setText(history.forward(textField.getText()));
+                        textField.setCaretPosition(textField.getText().length());
                     }
                     break;
                 case KeyEvent.VK_UP:
