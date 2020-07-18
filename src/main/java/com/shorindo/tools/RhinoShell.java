@@ -124,6 +124,30 @@ public class RhinoShell extends WindowAdapter {
                         textField.setCaretPosition(textField.getText().length());
                     }
                     break;
+                case KeyEvent.VK_F:
+                    if ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0) {
+                        int position = textField.getCaretPosition();
+                        if (position < textField.getText().length()) {
+                            textField.setCaretPosition(position + 1);
+                        }
+                    }
+                    break;
+                case KeyEvent.VK_B:
+                    if ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0) {
+                        int position = textField.getCaretPosition();
+                        if (position > 0) {
+                            textField.setCaretPosition(position - 1);
+                        }
+                    }
+                    break;
+                case KeyEvent.VK_K:
+                    if ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0) {
+                        String text = textField.getText();
+                        text = text.substring(0, textField.getCaretPosition());
+                        textField.setText(text);
+                        textField.setCaretPosition(text.length());
+                    }
+                    break;
                 case KeyEvent.VK_N:
                     if ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0) {
                         textField.setText(history.forward(textField.getText()));
