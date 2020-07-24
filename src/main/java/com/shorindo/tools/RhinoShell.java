@@ -20,6 +20,11 @@ import java.awt.Font;
 import java.awt.Frame;
 import java.awt.TextArea;
 import java.awt.TextField;
+import java.awt.Toolkit;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.StringSelection;
+import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.WindowAdapter;
@@ -97,35 +102,35 @@ public class RhinoShell extends WindowAdapter {
                     }
                     break;
                 case KeyEvent.VK_L:
-                    if ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0) {
+                    if (isControl(e)) {
                         textArea.setText("");
                     }
                     break;
                 case KeyEvent.VK_U:
-                    if ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0) {
+                    if (isControl(e)) {
                         textField.setCaretPosition(0);
                         textField.setText("");
                     }
                     break;
                 case KeyEvent.VK_A:
-                    if ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0) {
+                    if (isControl(e)) {
                         textField.setCaretPosition(0);
                         e.consume();
                     }
                     break;
                 case KeyEvent.VK_E:
-                    if ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0) {
+                    if (isControl(e)) {
                         textField.setCaretPosition(textField.getText().length());
                     }
                     break;
                 case KeyEvent.VK_P:
-                    if ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0) {
+                    if (isControl(e)) {
                         textField.setText(history.back(textField.getText()));
                         textField.setCaretPosition(textField.getText().length());
                     }
                     break;
                 case KeyEvent.VK_F:
-                    if ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0) {
+                    if (isControl(e)) {
                         int position = textField.getCaretPosition();
                         if (position < textField.getText().length()) {
                             textField.setCaretPosition(position + 1);
@@ -133,7 +138,7 @@ public class RhinoShell extends WindowAdapter {
                     }
                     break;
                 case KeyEvent.VK_B:
-                    if ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0) {
+                    if (isControl(e)) {
                         int position = textField.getCaretPosition();
                         if (position > 0) {
                             textField.setCaretPosition(position - 1);
@@ -141,19 +146,41 @@ public class RhinoShell extends WindowAdapter {
                     }
                     break;
                 case KeyEvent.VK_K:
-                    if ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0) {
+                    if (isControl(e)) {
                         String text = textField.getText();
+                        String cut = text.substring(textField.getCaretPosition());
                         text = text.substring(0, textField.getCaretPosition());
+                        Toolkit kit = Toolkit.getDefaultToolkit();
+                		Clipboard clip = kit.getSystemClipboard();
+                		StringSelection ss = new StringSelection(cut);
+                		clip.setContents(ss, ss);                        
                         textField.setText(text);
                         textField.setCaretPosition(text.length());
                     }
                     break;
                 case KeyEvent.VK_N:
-                    if ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0) {
-                        textField.setText(history.forward(textField.getText()));
+                    if (isControl(e)) {
+                    	textField.setText(history.forward(textField.getText()));
                         textField.setCaretPosition(textField.getText().length());
                     }
                     break;
+                case KeyEvent.VK_Y:
+                	if (isControl(e)) {
+                		Toolkit kit = Toolkit.getDefaultToolkit();
+                		Clipboard clip = kit.getSystemClipboard();
+                		try {
+                            String before = textField.getText().substring(0, textField.getCaretPosition());
+                            String after = textField.getText().substring(textField.getCaretPosition());
+                			String text = (String) clip.getData(DataFlavor.stringFlavor);
+                			textField.setText(before + text + after);
+                            textField.setCaretPosition((before + text).length());
+                		} catch (UnsupportedFlavorException ex) {
+                			ex.printStackTrace();
+                		} catch (IOException ex) {
+                			ex.printStackTrace();
+                		}
+                	}
+                	break;
                 case KeyEvent.VK_UP:
                     textField.setText(history.back(textField.getText()));
                     textField.setCaretPosition(textField.getText().length());
@@ -167,6 +194,10 @@ public class RhinoShell extends WindowAdapter {
 
             @Override
             public void keyReleased(KeyEvent e) {
+            }
+            
+            private boolean isControl(KeyEvent e) {
+            	return ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0);
             }
             
         });
