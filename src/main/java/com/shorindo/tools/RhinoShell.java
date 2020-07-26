@@ -47,6 +47,7 @@ import org.mozilla.javascript.tools.shell.Main;
  */
 public class RhinoShell extends WindowAdapter {
     private static final String PROMPT = "rhino> ";
+    private static final String FONT_NAME = "ＭＳ　ゴシック";
     private TextArea textArea;
     private TextField textField;
     private InputStream in;
@@ -73,10 +74,10 @@ public class RhinoShell extends WindowAdapter {
         }.start();
 
         textArea = new TextArea(24, 80);
-        textArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        textArea.setFont(new Font(FONT_NAME, Font.PLAIN, 16));
         textArea.setEditable(false);
         textField = new TextField();
-        textField.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        textField.setFont(new Font(FONT_NAME, Font.PLAIN, 16));
         textField.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
         textField.addKeyListener(new KeyListener() {
             private History history = new History();

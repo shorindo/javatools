@@ -22,8 +22,8 @@ import java.io.ByteArrayInputStream;
 import org.junit.Test;
 
 import com.shorindo.tools.PEGCombinator;
-import com.shorindo.tools.PEGCombinator.BacktrackInputStream;
-import com.shorindo.tools.PEGCombinator.Node;
+import com.shorindo.tools.PEGCombinator.PEGContext;
+import com.shorindo.tools.PEGCombinator.PEGNode;
 import com.shorindo.tools.PEGCombinator.UnmatchException;
 
 /**

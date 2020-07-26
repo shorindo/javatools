@@ -21,7 +21,7 @@ import java.util.Arrays;
  * 
  */
 public class VirtualTerminal {
-    private static final ToolsLogger LOG = ToolsLogger.getLogger(VirtualTerminal.class);
+    private static final Logger LOG = Logger.getLogger(VirtualTerminal.class);
     private VirtualCharacter[] vchars;
     private int rowSize = 0;
     private int colSize = 0;

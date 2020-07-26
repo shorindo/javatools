@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 Shorindo, Inc.
+ * Copyright 2017-2020 Shorindo, Inc.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,12 +15,19 @@
  */
 package com.shorindo.tools;
 
-import java.io.IOException;
-import java.io.InputStream;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.Stack;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -28,247 +35,581 @@ import java.util.regex.Pattern;
  * PEGによる構文解析器を生成する
  */
 public class PEGCombinator {
-    private static final ToolsLogger LOG = ToolsLogger.getLogger(PEGCombinator.class);
-    private static final UnmatchException UNMATCH = new UnmatchException();
-    private Map<String,Rule> ruleMap;
+    private static Logger LOG = Logger.getLogger(PEGCombinator.class);
+    private Map<RuleTypes,Rule> ruleMap;
+    private Stack<Rule> ruleStack;
 
     /**
      * 
      */
     public PEGCombinator() {
-        ruleMap = new HashMap<String,Rule>();
+        ruleMap = new HashMap<>();
+        ruleStack = new Stack<>();
     }
 
-    protected Rule rule(final String ruleName) {
-        if (!ruleMap.containsKey(ruleName)) {
-            ruleMap.put(ruleName, new Rule(ruleName) {
-                @Override
-                public Node accept(BacktrackInputStream is) throws IOException,
-                        UnmatchException {
-                    Node $$ = new Node(ruleName);
-                    $$.setName(ruleName);
-                    for (Rule rule : childRules) {
-                        $$.add(rule.accept(is));
-                    }
-                    LOG.debug("rule[" + ruleName + "] : accept");
-                    return $$;
-                }
-            });
-        }
-        return ruleMap.get(ruleName);
+    public PEGContext createContext(String text) {
+        return new PEGContext(text);
     }
 
-    protected Rule rule$Any() {
-        return new Rule("rule$Any") {
+    public Rule define(RuleTypes ruleType, Rule...rules) {
+        Rule rule = new Rule(ruleType) {
+
             @Override
-            public Node accept(BacktrackInputStream is) throws IOException, UnmatchException {
-                int c = is.read();
-                if (c == -1) {
-                    throw UNMATCH;
+            public PEGNode accept(PEGContext ctx) throws PEGException {
+                if (ctx.hasMemo(this)) {
+                    return ctx.getMemo(this);
+                }
+                PEGNode $$ = new PEGNode(ctx, ruleType);
+                int curr = ctx.position();
+                ruleStack.push(this);
+                try {
+                    $$.setType(ruleType);
+                    for (Rule rule : rules) {
+                        PEGNode childNode = rule.accept(ctx);
+                        $$.add(childNode);
+                    }
+                    String sub = ctx.subString(curr, ctx.position);
+                    $$.setSource(sub);
+                    StringBuffer trace = new StringBuffer();
+                    String prefix = "";
+                    for (int i = 0; i < ruleStack.size(); i++) {
+                        trace.append(prefix + ruleStack.get(i).getType());
+                        prefix = "->";
+                    }
+                    LOG.trace("rule({0})[{1}] accept <- {2} : {3}",
+                        ruleType, curr, $$.getSource(), trace.toString());
+                    return ctx.success(this, action.apply($$), curr, ctx.position());
+                } catch (UnmatchException e) {
+                    ctx.failure(curr, this);
+//                    LOG.trace("rule({0})[{1}] deny <- {2}",
+//                        ruleType, curr, ctx.subString(curr));
+                    throw e;
+                } finally {
+                    ruleStack.pop();
+                }
+            }
+
+            public String toString(int depth, Set<RuleTypes> visited) {
+                if (visited.contains(getType())) {
+                    return indent(depth) + getType().name() + "\n";
                 } else {
-                    LOG.trace("rule$Any() : accept <= " + (char)c);
-                    Node $$ = new Node("any");
-                    $$.setValue((char)c);
-                    return $$;
+                    visited.add(getType());
+                    StringBuffer sb = new StringBuffer(indent(depth) + "(" + ruleType + "\n");
+                    for (Rule child : rules) {
+                        if (this != child)
+                            sb.append(child.toString(depth + 1, visited));
+                    }
+                    sb.append(indent(depth) + ")\n");
+                    return sb.toString();
                 }
             }
+            
+            public String toString() {
+                Set<RuleTypes> visited = new HashSet<>();
+                return toString(0, visited);
+            }
         };
+        ruleMap.put(ruleType, rule);
+        return rule;
     }
 
-// FIXME 子ルールが不一致のとき、入力が巻き戻されてしまう
-//    protected Rule rule$Not(final Rule rule) {
-//        return new Rule("rule$Not") {
-//            @Override
-//            public Node accept(BacktrackInputStream is) throws IOException, UnmatchException {
-//                int pos = is.position();
-//                try {
-//                    rule.accept(is);
-//                } catch (UnmatchException e) {
-//                    LOG.debug("rule$Not() <= " + rule);
-//                    return new Node("not");
-//                }
-//                is.reset(pos);
-//                throw UNMATCH;
-//            }
-//        };
-//    }
-
-    protected Rule rule$Literal(final String literal) {
-        return new Rule("rule$Literal") {
+    public Rule rule(final RuleTypes ruleType) {
+        Rule rule = new Rule(ruleType) {
             @Override
-            public Node accept(BacktrackInputStream is) throws IOException, UnmatchException {
-                int mark = is.position();
-                for (int i = 0; i < literal.length(); i++) {
-                    char c = literal.charAt(i);
-                    int r = is.read();
-                    LOG.debug("rule$Literal('" + format(literal) + "') <= " + (char)r);
-                    if (c != r) {
-                        is.reset(mark);
-                        throw UNMATCH;
-                    }
+            public PEGNode accept(PEGContext ctx) throws PEGException {
+                Rule rule = ruleMap.get(ruleType);
+                if (rule == null) {
+                    throw new PEGException(ruleType + " is not defined.");
                 }
-                LOG.debug("rule$Literal('" + format(literal) + "') : accept");
-                Node $$ = new Node("literal");
-                $$.setValue(literal);
-                return $$;
+                try {
+                    PEGNode $$ = rule.accept(ctx);
+                    return action.apply($$);
+                } catch (UnmatchException e) {
+                    throw e;
+                }
+            }
+            
+            public String toString(int depth, Set<RuleTypes> visited) {
+                Rule rule = ruleMap.get(ruleType);
+                if (rule == null) {
+                    throw new RuntimeException(ruleType + " is not defined.");
+                }
+                return rule.toString(depth + 1, visited);
+            }
+            
+            public String toString() {
+                Set<RuleTypes> visited = new HashSet<>();
+                return toString(0, visited);
             }
         };
+        return rule;
+    }
+
+    public Rule rule$Any() {
+        Rule rule = new Rule(Types.PEG_ANY) {
+            @Override
+            public PEGNode accept(PEGContext ctx) throws PEGException {
+                if (ctx.hasMemo(this)) {
+                    return ctx.getMemo(this);
+                }
+                int curr = ctx.position();
+                int c = ctx.read();
+                if (c == -1) {
+                    ctx.failure(curr, this);
+                    //LOG.trace("rule$Any()[{0}] deny <- {1}", curr, (char)c);
+                    throw new UnmatchException();
+                } else {
+                    PEGNode $$ = new PEGNode(ctx, Types.PEG_ANY);
+                    $$.setSource(String.valueOf((char)c));
+                    $$.setValue(String.valueOf((char)c));
+                    LOG.trace("rule$Any()[{0}] accept <- {1}", curr, (char)c);
+                    return ctx.success(this, action.apply($$), curr, ctx.position());
+                }
+            }
+            
+            public String toString(int depth, Set<RuleTypes> visited) {
+                return indent(depth) + ".\n";
+            }
+        };
+        return rule;
+    }
+
+    public Rule rule$And(final Rule rule) {
+        return rule$And(0, rule);
+    }
+
+    public Rule rule$And(int preceeding, final Rule childRule) {
+        Rule rule = new Rule(Types.PEG_AND) {
+            @Override
+            public PEGNode accept(PEGContext ctx) throws PEGException {
+                if (ctx.hasMemo(this)) {
+                    return ctx.getMemo(this);
+                }
+                int curr = ctx.position();
+                int next = curr + preceeding;
+                try {
+                    if (next < 0 || preceeding > ctx.available()) {
+                        throw new UnmatchException();
+                    }
+                    childRule.accept(ctx);
+                    PEGNode $$ = new PEGNode(ctx, Types.PEG_AND);
+                    $$.setSource("");
+                    LOG.trace("rule$And()[{0}] accept <- {1}", curr, childRule.getType());
+                    return ctx.success(this, action.apply($$), curr, ctx.position());
+                } catch (UnmatchException e) {
+                    ctx.failure(curr, this);
+                    //LOG.trace("rule$And()[{0}] deny <- {1}", curr, childRule);
+                    throw e;
+                } finally {
+                    ctx.reset(curr);
+                }
+            }
+            
+            public String toString(int depth, Set<RuleTypes> visited) {
+                return "&" + childRule.toString(depth, visited);
+            }
+        };
+        return rule;
+    }
+
+    public Rule rule$Not(final Rule rule) {
+        return rule$Not(0, rule);
+    }
+
+    public Rule rule$Not(int preceeding, final Rule childRule) {
+        Rule rule = new Rule(Types.PEG_NOT) {
+            @Override
+            public PEGNode accept(PEGContext ctx) throws PEGException {
+                if (ctx.hasMemo(this)) {
+                    return ctx.getMemo(this);
+                }
+                int curr = ctx.position();
+                int next = curr + preceeding;
+                try {
+                    if (next < 0 || preceeding > ctx.available()) {
+                        throw new UnmatchException();
+                    }
+                    ctx.reset(curr + preceeding);
+                    childRule.accept(ctx);
+                } catch (UnmatchException e) {
+                    PEGNode $$ = new PEGNode(ctx, Types.PEG_NOT);
+                    $$.setSource("");
+                    LOG.trace("rule$Not()[{0}] accept <- {1}", curr, childRule.getType());
+                    return ctx.success(this, action.apply($$), curr, ctx.position());
+                } finally {
+                    ctx.reset(curr);
+                }
+                ctx.failure(curr, this);
+                //LOG.trace("rule$Not()[{0}] deny <- {1}", curr, childRule);
+                throw new UnmatchException();
+            }
+            
+            public String toString(int depth, Set<RuleTypes> visited) {
+                return indent(depth) + "(!\n" + childRule.toString(depth + 1, visited) + indent(depth) + ")\n";
+            }
+        };
+        return rule;
+    }
+
+        
+    public Rule rule$Literal(final String literal) {
+        return rule$Literal(literal, false);
+    }
+
+    public Rule rule$Literal(final String literal, boolean ignoreCase) {
+        Rule rule = new Rule(Types.PEG_LITERAL) {
+            @Override
+            public PEGNode accept(PEGContext ctx) throws PEGException {
+                if (ctx.hasMemo(this)) {
+                    return ctx.getMemo(this);
+                }
+                int curr = ctx.position();
+                for (int i = 0; i < literal.length(); i++) {
+                    char c = ignoreCase
+                        ? Character.toLowerCase(literal.charAt(i))
+                        : literal.charAt(i);
+                    int r = ignoreCase
+                        ? Character.toLowerCase(ctx.read())
+                        : ctx.read();
+                    if (c != r) {
+                        //LOG.trace("rule$Literal()[{0}] deny <- {1}", curr, escape(literal));
+                        ctx.reset(curr);
+                        ctx.failure(curr, this);
+                        throw new UnmatchException();
+                    }
+                }
+                PEGNode $$ = new PEGNode(ctx, Types.PEG_LITERAL);
+                $$.setSource(literal);
+                $$.setValue(literal);
+                LOG.trace("rule$Literal()[{0}] accept <- {1}", curr, escape(literal));
+                return ctx.success(this, action.apply($$), curr, ctx.position());
+            }
+            
+            public String toString(int depth, Set<RuleTypes> visited) {
+                return indent(depth) + "'" + escape(literal) + "'\n";
+            }
+        };
+        return rule;
     }
     
-    protected Rule rule$Class(final String charClass) {
-        return new Rule("rule$Class") {
+    public Rule rule$Class(final String charClass) {
+        Rule rule = new Rule(Types.PEG_CLASS) {
             Pattern pattern = Pattern.compile("[" + charClass + "]");
 
             @Override
-            public Node accept(BacktrackInputStream is) throws IOException,
-                    UnmatchException {
-                int curr = is.position();
-                int c = is.read();
+            public PEGNode accept(PEGContext ctx) throws PEGException {
+                if (ctx.hasMemo(this)) {
+                    return ctx.getMemo(this);
+                }
+                int curr = ctx.position();
+                int c = ctx.read();
                 if (c == -1) {
-                    throw UNMATCH;
+                    //LOG.trace("rule$Class({0})[{1}] deny <- {2}",
+                    //    escape(charClass), curr, escape(String.valueOf((char)c)));
+                    ctx.failure(curr, this);
+                    ctx.reset(curr);
+                    throw new UnmatchException();
                 }
                 Matcher m = pattern.matcher(String.valueOf((char)c));
                 if (m.matches()) {
-                    Node $$ = new Node("class");
-                    $$.setValue((char)c);
-                    LOG.debug("rule$Class('" + format(charClass) + "') : accept <= " + (char)c);
-                    return $$;
+                    PEGNode $$ = new PEGNode(ctx, Types.PEG_CLASS);
+                    $$.setSource(String.valueOf((char)c));
+                    $$.setValue(String.valueOf((char)c));
+                    LOG.trace("rule$Class({0})[{1}] accept <- {2}",
+                        escape(charClass), curr, escape(String.valueOf((char)c)));
+                    return ctx.success(this, action.apply($$), curr, ctx.position());
                 } else {
-                    is.reset(curr);
-                    throw UNMATCH;
+                    ctx.reset(curr);
+                    throw new UnmatchException();
                 }
             }
+            
+            public String toString(int depth, Set<RuleTypes> visited) {
+                return indent(depth) + "[" + escape(charClass) + "]\n";
+            }
         };
+        return rule;
     }
-    protected Rule rule$ZeroOrMore(final Rule...rules) {
-        return new Rule("rule$ZeroOrMore") {
+
+    public Rule rule$RegExp(final String regexp) {
+        Rule rule = new Rule(Types.PEG_REGEXP) {
+            Pattern pattern = Pattern.compile("^" + regexp);
+
             @Override
-            public Node accept(BacktrackInputStream is) throws IOException,
-                    UnmatchException {
-                Node $$ = new Node("*");
+            public PEGNode accept(PEGContext ctx) throws PEGException {
+                if (ctx.hasMemo(this)) {
+                    return ctx.getMemo(this);
+                }
+                int start = ctx.position();
+                Matcher matcher = pattern.matcher(ctx.source.substring(start));
+                if (matcher.find()) {
+                    PEGNode $$ = new PEGNode(ctx, Types.PEG_REGEXP);
+                    String source = matcher.group();
+                    ctx.reset(start + source.length());
+                    $$.setSource(source);
+                    $$.setValue(source);
+                    PEGNode $i = new PEGNode(ctx, Types.PEG_REGEXP);
+                    $i.setValue(matcher.group(0));
+                    $$.add($i);
+                    for (int i = 0; i < matcher.groupCount(); i++) {
+                        $i = new PEGNode(ctx, Types.PEG_REGEXP);
+                        $i.setValue(matcher.group(i + 1));
+                        $$.add($i);
+                    }
+                    LOG.trace("rule$RegExp({0})[{1}] accept <- {2}",
+                        escape(regexp), start, escape(source));
+                    return ctx.success(this, action.apply($$), start, ctx.position());
+                } else {
+                    ctx.failure(start, this);
+                    ctx.reset(start);
+                    throw new UnmatchException();
+                }
+            }
+            
+            public String toString(int depth, Set<RuleTypes> visited) {
+                return indent(depth) + "/" + escape(regexp) + "/\n";
+            }
+        };
+        return rule;
+    }
+
+    public Rule rule$ZeroOrMore(final Rule...rules) {
+        Rule rule = new Rule(Types.PEG_ZERO_OR_MORE) {
+            @Override
+            public PEGNode accept(PEGContext ctx) throws PEGException {
+                if (ctx.hasMemo(this)) {
+                    return ctx.getMemo(this);
+                }
+                PEGNode $$ = new PEGNode(ctx, Types.PEG_ZERO_OR_MORE);
+                int start = ctx.position();
                 while (true) {
-                    int curr = is.position();
+                    PEGNode seq = new PEGNode(ctx, Types.PEG_SEQUENCE);
+                    int curr = ctx.position();
                     try {
                         for (Rule child : rules) {
-                            $$.add(child.accept(is));
+                            seq.add(child.accept(ctx));
                         }
                     } catch (UnmatchException e) {
-                        is.reset(curr);
+                        //LOG.trace("rule$ZeroOrMore[{0}] deny", start);
+                        ctx.failure(start, this);
+                        ctx.reset(curr);
                         break;
+                    } finally {
+                        if (seq.length() == rules.length) {
+                            $$.add(seq);
+                        }
                     }
                 }
-                LOG.trace("rule$ZeroOrMore[" + toString(rules) + "] : accept");
-                return $$;
+                $$.setSource(ctx.subString(start, ctx.position()));
+                LOG.trace("rule$ZeroOrMore[{0}] accept <- ''{1}''", start, $$.getSource());
+                return ctx.success(this, action.apply($$), start, ctx.position());
+            }
+            
+            public String toString(int depth, Set<RuleTypes> visited) {
+                StringBuffer sb = new StringBuffer();
+                sb.append(indent(depth) + "(*\n");
+                for (int i = 0; i < rules.length; i++) {
+                    sb.append(rules[i].toString(depth + 1, visited));
+                }
+                sb.append(indent(depth) + ")\n");
+                return sb.toString();
             }
         };
+        return rule;
     }
-    protected Rule rule$OneOrMore(final Rule...rules) {
-        return new Rule("rule$OneOrMore") {
+
+    public Rule rule$OneOrMore(final Rule...rules) {
+        Rule rule = new Rule(Types.PEG_ONE_OR_MORE) {
             @Override
-            public Node accept(BacktrackInputStream is) throws IOException,
-                    UnmatchException {
+            public PEGNode accept(PEGContext ctx) throws PEGException {
+                if (ctx.hasMemo(this)) {
+                    return ctx.getMemo(this);
+                }
                 int count = 0;
-                Node $$ = new Node("+");
+                PEGNode $$ = new PEGNode(ctx, Types.PEG_ONE_OR_MORE);
+                int start = ctx.position();
                 while (true) {
-                    int curr = is.position();
+                    PEGNode seq = new PEGNode(ctx, Types.PEG_SEQUENCE);
+                    int curr = ctx.position();
                     try {
                         for (Rule child : rules) {
-                            $$.add(child.accept(is));
+                            seq.add(child.accept(ctx));
                         }
                         count++;
                     } catch (UnmatchException e) {
-                        is.reset(curr);
+                        ctx.reset(curr);
                         break;
+                    } finally {
+                        if (seq.length() == rules.length) {
+                            $$.add(seq);
+                        }
                     }
                 }
                 if (count > 0) {
-                    LOG.trace("rule$ZeroOrMore[" + toString(rules) + " : accept");
-                    return $$;
+                    $$.setSource(ctx.subString(start, ctx.position()));
+                    LOG.trace("rule$OneOrMore[{0}] accept <- ''{1}''", start, $$.getSource());
+                    return ctx.success(this, action.apply($$), start, ctx.position());
                 } else {
-                    throw UNMATCH;
+                    //LOG.trace("rule$OneOrMore[{0}] deny", start);
+                    ctx.failure(start, this);
+                    throw new UnmatchException();
                 }
             }
+            
+            public String toString(int depth, Set<RuleTypes> visited) {
+                StringBuffer sb = new StringBuffer();
+                if (rules.length == 1) {
+                    sb.append(rules[0].toString(depth + 1, visited));
+                } else {
+                    String sep = "";
+                    sb.append(indent(depth) + "(\n");
+                    for (int i = 0; i < rules.length; i++) {
+                        sb.append(sep + rules[i].toString(depth + 1, visited));
+                        sep = ", ";
+                    }
+                    sb.append(indent(depth) + ")\n");
+                }
+                return sb.toString();
+            }
         };
+        return rule;
     }
-    protected Rule rule$Sequence(final Rule...rules) {
-        return new Rule("rule$Sequence") {
+    
+    public Rule rule$Sequence(final Rule...rules) {
+        Rule rule = new Rule(Types.PEG_SEQUENCE) {
             @Override
-            public Node accept(BacktrackInputStream is) throws IOException,
-                    UnmatchException {
+            public PEGNode accept(PEGContext ctx) throws PEGException {
+                if (ctx.hasMemo(this)) {
+                    return ctx.getMemo(this);
+                }
                 //LOG.trace(toString());
-                int curr = is.position();
-                Node $$ = new Node("sequence");
+                int curr = ctx.position();
+                PEGNode $$ = new PEGNode(ctx, Types.PEG_SEQUENCE);
                 try {
                     for (Rule child : rules) {
-                        Node $n = (Node)child.accept(is);
+                        PEGNode $n = (PEGNode)child.accept(ctx);
                         $$.add($n);
                     }
                 } catch (UnmatchException e) {
-                    is.reset(curr);
+                    //LOG.trace("rule$Sequence deny <- " + $$.getSource());
+                    ctx.failure(curr, this);
+                    ctx.reset(curr);
                     throw e;
                 }
-                LOG.trace("rule$Sequence <= " + toString(rules));
-                return $$;
+                $$.setSource(ctx.subString(curr, ctx.position()));
+                LOG.trace("rule$Sequence accept <- " + $$.getSource());
+                return ctx.success(this, action.apply($$), curr, ctx.position());
+            }
+            
+            public String toString(int depth, Set<RuleTypes> visited) {
+                StringBuffer sb = new StringBuffer();
+                if (rules.length == 1) {
+                    sb.append(rules[0].toString(depth, visited));
+                } else {
+                    sb.append(indent(depth) + "(=\n");
+                    for (Rule child : rules) {
+                        sb.append(child.toString(depth + 1, visited));
+                    }
+                    sb.append(indent(depth) + ")\n");
+                }
+                return sb.toString();
             }
         };
+        return rule;
     }
     
-    protected Rule rule$Choice(final Rule...rules) {
-        return new Rule("rule$Choice") {
+    public Rule rule$Choice(final Rule...rules) {
+        Rule rule = new Rule(Types.PEG_CHOICE) {
             @Override
-            public Node accept(BacktrackInputStream is) throws IOException,
-                    UnmatchException {
+            public PEGNode accept(PEGContext ctx) throws PEGException {
+                if (ctx.hasMemo(this)) {
+                    return ctx.getMemo(this);
+                }
                 //LOG.trace(toString());
-                int curr = is.position();
-                for (Rule child : rules) {
+                int curr = ctx.position();
+                for (Rule child : childRules) {
                     try {
-                        LOG.debug("rule$Choice(" + toString(child) + ")");
-                        return child.accept(is);
+                        PEGNode $$ = child.accept(ctx);
+                        $$.setSource(ctx.subString(curr, ctx.position()));
+                        LOG.trace("rule$Choice()[{0}] accept", curr);
+                        return ctx.success(this, action.apply($$), curr, ctx.position());
                     } catch (UnmatchException e) {
-                        is.reset(curr);
+                        ctx.reset(curr);
                     }
                 }
-                throw UNMATCH;
+                //LOG.trace("rule$Choice()[{0}] deny", curr);
+                ctx.failure(curr, this);
+                throw new UnmatchException();
+            }
+            
+            public String toString(int depth, Set<RuleTypes> visited) {
+                StringBuffer sb = new StringBuffer(indent(depth) + "(/\n");
+                String sep = indent(depth + 1);
+                for (Rule child : childRules) {
+                    sb.append(child.toString(depth + 1, visited));
+                    //sep = "\n," + indent(depth + 1);
+                }
+                sb.append(indent(depth) + ")\n");
+                return sb.toString();
             }
         };
+        for (Rule child : rules) {
+            rule.add(child);
+        }
+        return rule;
     }
 
-    protected Rule rule$Optional(final Rule...rules) {
-        return new Rule("rule$Optional") {
+    public Rule rule$Optional(final Rule...rules) {
+        Rule rule = new Rule(Types.PEG_OPTIONAL) {
             @Override
-            public Node accept(BacktrackInputStream is) throws IOException,
-                    UnmatchException {
-//                for (Rule child : rules) {
-//                    childRules.add(child);
-//                }
-
-                int curr = is.position();
-                Node $$ = new Node("optional");
-                try {
-                    for (Rule child : rules) {
-                        $$.add(child.accept(is));
-                    }
-                    LOG.trace("rule$Optional() <= " + toString(rules));
-                } catch (UnmatchException e) {
-                    $$.clear();
-                    is.reset(curr);
+            public PEGNode accept(PEGContext ctx) throws PEGException {
+                if (ctx.hasMemo(this)) {
+                    return ctx.getMemo(this);
                 }
-                return $$;
+
+                int curr = ctx.position();
+                PEGNode $$ = new PEGNode(ctx, Types.PEG_OPTIONAL);
+                try {
+                    for (Rule child : childRules) {
+                        $$.add(child.accept(ctx));
+                    }
+                    //LOG.trace("rule$Optional() <= " + toString(rules));
+                } catch (UnmatchException e) {
+                    //LOG.trace("rule$Optional deny <- " + $$.getSource());
+                    ctx.failure(curr, this);
+                    $$.clear();
+                    ctx.reset(curr);
+                }
+                $$.setSource(ctx.subString(curr, ctx.position()));
+                LOG.trace("rule$Optional accept <- " + $$.getSource());
+                return ctx.success(this, action.apply($$), curr, ctx.position());
+            }
+
+            @Override
+            public String toString(int depth, Set<RuleTypes> visited) {
+                StringBuffer sb = new StringBuffer(indent(depth) + "(?\n");
+                for (Rule child : childRules) {
+                    sb.append(" " + child.toString(depth + 1, visited));
+                }
+                sb.append(indent(depth) + ")\n");
+                return sb.toString();
             }
         };
-    }
-
-    protected String format(String s) {
-        return s
-                .replaceAll("\\\\", "\\\\")
-                .replaceAll("\r", "\\\\r")
-                .replaceAll("\n", "\\\\n")
-                .replaceAll("\t", "\\\\t");
-        
+        for (Rule child : rules) {
+            rule.add(child);
+        }
+        return rule;
     }
 
     @SuppressWarnings("serial")
-    public static class UnmatchException extends Exception {
+    public static class PEGException extends Exception {
+        public PEGException() {}
+        public PEGException(String msg) { super(msg); }
+        public PEGException(Exception e) { super(e); }
+    }
+
+    public static class UnmatchException extends PEGException {
+        private static final long serialVersionUID = -5428867116035040421L;
         public UnmatchException() {}
         public UnmatchException(String msg) { super(msg); }
         public UnmatchException(Exception e) { super(e); }
@@ -278,29 +619,45 @@ public class PEGCombinator {
      * 
      */
     public static abstract class Rule {
-        protected String ruleName;
+        public RuleTypes type;
+        protected Function<PEGNode,PEGNode> action;
         protected List<Rule> childRules = new ArrayList<Rule>();
 
-        public abstract Node accept(BacktrackInputStream is)
-                throws IOException, UnmatchException;
-
-        public Rule(String ruleName) {
-            this.ruleName = ruleName;
+        public Rule(RuleTypes type) {
+            this.type = type;
+            this.action = new Function<PEGNode,PEGNode>() {
+                @Override
+                public PEGNode apply(PEGNode $$) {
+                    return $$;
+                }
+            };
         }
 
-        public Rule define(Rule...rules) {
-            for (Rule child : rules) {
-                childRules.add(child);
-            }
+        public abstract PEGNode accept(PEGContext ctx)
+                throws PEGException;
+
+        public abstract String toString(int depth, Set<RuleTypes> visited);
+
+        public RuleTypes getType() {
+            return type;
+        }
+
+        public Rule add(Rule child) {
+            childRules.add(child);
             return this;
         }
 
         public Rule get(int i) {
             return childRules.get(i);
         }
+        
+        public Rule action(Function<PEGNode,PEGNode> action) {
+            this.action = action;
+            return this;
+        }
 
         public String toString(Rule...rules) {
-            StringBuffer sb = new StringBuffer(this.ruleName);
+            StringBuffer sb = new StringBuffer(type.name());
             String sep = "";
             sb.append("[");
             for (Rule rule : rules) {
@@ -312,44 +669,68 @@ public class PEGCombinator {
         }
 
         public String toString() {
-            return toString(childRules.toArray(new Rule[]{}));
+            StringBuffer sb = new StringBuffer("(" + type.name());
+            for (Rule child : childRules) {
+                sb.append(" " + child.toString());
+            }
+            sb.append(")");
+            return sb.toString();
         }
+    }
+
+    private static String escape(String text) {
+        return text
+            .replaceAll("\\\\", "\\\\\\\\")
+            .replaceAll("\t", "\\\\t")
+            .replaceAll("\r", "\\\\r")
+            .replaceAll("\n", "\\\\n");
+    }
+    
+    private static String indent(int depth) {
+        StringBuffer sb = new StringBuffer();
+        for (int i = 0; i < depth; i++) {
+            sb.append("  ");
+        }
+        return sb.toString();
     }
 
     /**
      * 
      */
-    public static class Node {
-        private String name;
-        private Object value;
+    public static class PEGNode {
+        private PEGContext ctx;
+        private RuleTypes type;
+        private String source;
+        private String value;
         private boolean empty = false;
-        private List<Node> childList = new ArrayList<Node>();
+        private List<PEGNode> childList = new ArrayList<PEGNode>();
 
-        public Node(String name) {
-            this.name = name;
+        public PEGNode(PEGContext ctx, RuleTypes type) {
+            this.ctx = ctx;
+            this.type = type;
         }
-        public String getName() {
-            return name;
+        public RuleTypes getType() {
+            return type;
         }
-        public void setName(String name) {
-            this.name = name;
+        public void setType(RuleTypes type) {
+            this.type = type;
         }
-        public Object getValue() {
+        public String getValue() {
             return value;
         }
-        public void setValue(Object value) {
+        public void setValue(String value) {
             this.value = value;
         }
-        public boolean isEmpty() {
-            return empty;
-        }
-        public void setEmpty(boolean empty) {
-            this.empty = empty;
-        }
-        public void add(Node child) {
+//        public boolean isEmpty() {
+//            return empty;
+//        }
+//        public void setEmpty(boolean empty) {
+//            this.empty = empty;
+//        }
+        public void add(PEGNode child) {
             childList.add(child);
         }
-        public Node get(int i) {
+        public PEGNode get(int i) {
             return childList.get(i);
         }
         public int length() {
@@ -358,24 +739,54 @@ public class PEGCombinator {
         public void clear() {
             childList.clear();
         }
+        public PEGContext getContext() {
+            return ctx;
+        }
+        public void setSource(String source) {
+            this.source = source;
+        }
         public String getSource() {
-            StringBuilder sb = new StringBuilder();
-            if (value != null) {
-                sb.append(String.valueOf(getValue()));
+            return source;
+        }
+        public PEGNode pack() {
+            if (this.getValue() != null) {
+                return this;
+            } else {
+                StringBuffer sb = new StringBuffer();
+                for (int i = 0; i < this.length(); i++) {
+                    PEGNode $i = this.get(i);
+                    if ($i.getValue() == null) {
+                        $i.pack();
+                    }
+                    if ($i.getValue() != null) {
+                        sb.append($i.getValue());
+                    }
+                }
+                this.setValue(sb.toString());
+                return this;
             }
-            for (Node child : childList) {
-                sb.append(child.getSource());
-            }
-            return sb.toString();
         }
         public String toString() {
-            if (this.isEmpty()) {
+            if (value == null && childList.size() == 0) {
                 return "";
             }
             StringBuffer sb = new StringBuffer();
             sb.append("(");
-            sb.append(getName());
-            for (Node child : childList) {
+            switch (getType().name()) {
+            case "PEG_ANY": sb.append("."); break;
+            case "PEG_ZERO_OR_MORE": sb.append("*"); break;
+            case "PEG_ONE_OR_MORE": sb.append("+"); break;
+            case "PEG_CHOICE": sb.append("/"); break;
+            case "PEG_SEQUENCE": sb.append("="); break;
+            case "PEG_AND": sb.append("&"); break;
+            case "PEG_NOT": sb.append("!"); break;
+            case "PEG_CLASS": sb.append("[" + escape(getValue()) + "]"); break;
+            case "PEG_REGEXP": sb.append("/" + escape(getValue()) + "/"); break;
+            case "PEG_LITERAL": sb.append("'" + getValue() + "'"); break;
+            default:
+                sb.append(getType().name());
+            }
+            for (PEGNode child : childList) {
                 sb.append(" " + child.toString());
             }
             sb.append(")");
@@ -386,46 +797,209 @@ public class PEGCombinator {
     /**
      * 
      */
-    public static class BacktrackInputStream extends InputStream {
-        private InputStream is;
-        private List<Byte> buffer;
+    public static class PEGContext {
+        private String source;
         private int position = 0;
+        private boolean useMemo = true;
+        private Map<String,String> attrMap;
+        private Map<RuleTypes,Statistics> statsMap;
+        private Map<Rule,Map<Integer,Memo>> memoMap;
 
-        /**
-         * @param is
-         */
-        public BacktrackInputStream(InputStream is) {
-            this.is = is;
-            this.buffer = new ArrayList<Byte>();
+        protected PEGContext(String text) {
+            attrMap = new HashMap<>();
+            statsMap = new HashMap<>();
+            memoMap = new HashMap<>();
+            source = text;
         }
+
+        public PEGContext createContext(String text) {
+            return new PEGContext(text);
+        }
+
         public void reset(int position) {
             this.position = position;
         }
+
         public int position() {
             return position;
         }
+
         public void clear() {
             position = 0;
-            buffer = new ArrayList<Byte>();
         }
-        @Override
-        public int read() throws IOException {
-            int c = -1;
-            if (buffer.size() == position) {
-                c = is.read();
-                if (c != -1) {
-                    //bos.write(c);
-                    buffer.add((byte)c);
-                    position++;
+
+        public int read() {
+            if (available() > 0) {
+                return source.charAt(position++);
+            } else {
+                return -1;
+            }
+        }
+
+        public int available() {
+            return source.length() - position;
+        }
+        
+        public void setAttr(String key, String value) {
+            attrMap.put(key, value);
+        }
+        
+        public String getAttr(String key) {
+            return attrMap.get(key);
+        }
+        
+        /**
+         * 統計情報を取得する
+         */
+        public Map<RuleTypes,Statistics> getStatistics() {
+            return statsMap;
+        }
+
+        /**
+         * 成功した回数をカウントし、結果をメモる
+         */
+        public PEGNode success(Rule rule, PEGNode $$, int start, int end) {
+            if ($$ == null) throw new RuntimeException("$$ is null");
+            Statistics stat = statsMap.get(rule.getType());
+            if (stat == null) {
+                stat = new Statistics();
+                statsMap.put(rule.getType(), stat);
+            }
+            stat.success();
+
+            if (useMemo) {
+                Map<Integer,Memo> memo = memoMap.get(rule);
+                if (memo == null) {
+                    memo = new HashMap<>();
+                    memoMap.put(rule, memo);
+                }
+                memo.put(start, new Memo(start, end, $$));
+            }
+            return $$;
+        }
+        
+        /**
+         * 失敗した回数をカウントし、結果をメモる
+         */
+        public void failure(int position, Rule rule) {
+            Statistics stat = statsMap.get(rule.getType());
+            if (stat == null) {
+                stat = new Statistics();
+                statsMap.put(rule.getType(), stat);
+            }
+            stat.failure();
+            
+            if (useMemo) {
+                Map<Integer,Memo> memo = memoMap.get(rule);
+                if (memo == null) {
+                    memo = new HashMap<>();
+                    memoMap.put(rule, memo);
+                }
+                memo.put(position, null);
+            }
+        }
+
+        public boolean hasMemo(Rule rule) {
+            if (useMemo) {
+                Map<Integer,Memo> memo = memoMap.get(rule);
+                if (memo == null) {
+                    return false;
+                }
+                if (memo.containsKey(position())) {
+                    return true;
+                } else {
+                    return false;
                 }
             } else {
-                c = buffer.get(position++);
+                return false;
             }
-            return c;
         }
-        @Override
-        public int available() throws IOException {
-            return buffer.size() - position;
+        
+        public PEGNode getMemo(Rule rule) throws UnmatchException {
+            Map<Integer,Memo> memoIndex = memoMap.get(rule);
+            //LOG.debug("getMemo(" + rule + ") -> " + memo);
+            if (memoIndex != null) {
+                Memo memo = memoIndex.get(position());
+                //LOG.debug("getMemo(" + rule + ", " + position() + ") -> " + $$);
+                if (memo != null) {
+                    reset(memo.getEnd());
+                    return memo.getNode();
+                } else {
+                    throw new UnmatchException();
+                }
+            }
+            throw new RuntimeException("memo has no " + rule + " at " + position());
         }
+
+        public String subString(int start) {
+            return source.substring(start);
+        }
+
+        public String subString(int start, int end) {
+            return source.substring(start, end);
+        }
+    }
+    
+    protected static class Memo {
+        private int start;
+        private int end;
+        private PEGNode node;
+        
+        public Memo(int start, int end, PEGNode node) {
+            this.start = start;
+            this.end = end;
+            this.node = node;
+        }
+        public int getStart() {
+            return start;
+        }
+        public int getEnd() {
+            return end;
+        }
+        public PEGNode getNode() {
+            return node;
+        }
+    }
+
+    public static class Statistics {
+        private AtomicInteger success;
+        private AtomicInteger failure;
+
+        public Statistics() {
+            success = new AtomicInteger();
+            failure = new AtomicInteger();
+        }
+        public void success() {
+            success.incrementAndGet();
+        }
+        
+        public void failure() {
+            failure.incrementAndGet();
+        }
+        
+        public int getSuccess() {
+            return success.get();
+        }
+        
+        public int getFailure() {
+            return failure.get();
+        }
+    }
+
+    private enum Types implements RuleTypes {
+        PEG_ANY, PEG_AND, PEG_NOT, PEG_LITERAL, PEG_CLASS, PEG_REGEXP,
+        PEG_ZERO_OR_MORE, PEG_ONE_OR_MORE, PEG_SEQUENCE, PEG_CHOICE, PEG_OPTIONAL;
+    }
+
+    public interface RuleTypes {
+        public String name();
+    }
+    
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target({ 
+        ElementType.METHOD 
+    })
+    public @interface RuleName {
+        
     }
 }

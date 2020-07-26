@@ -33,7 +33,7 @@ import java.awt.event.WindowEvent;
  * 
  */
 public class TerminalView extends WindowAdapter implements ComponentListener {
-    private static final ToolsLogger LOG = ToolsLogger.getLogger(TerminalView.class);
+    private static final Logger LOG = Logger.getLogger(TerminalView.class);
     private final VirtualTerminal vt = new VirtualTerminal(24, 80);
 
     public static void main(String args[]) {
@@ -53,19 +53,19 @@ public class TerminalView extends WindowAdapter implements ComponentListener {
         frame.addKeyListener(new KeyListener() {
                 @Override
                 public void keyTyped(KeyEvent e) {
-                    LOG.debug(e.toString());
-                    if (e.isControlDown()) {
-                        LOG.debug("keyCode=" + e.getKeyCode());
-                        switch(e.getKeyCode()) {
-                        case 'l':
-                            vt.clear();
-                            break;
-                        default:
-                        }
-                    } else {
-                        vt.addChar(e.getKeyChar());
-                    }
-                    frame.repaint();
+//                    LOG.debug(e.toString());
+//                    if (e.isControlDown()) {
+//                        LOG.debug("keyCode=" + e.getKeyCode());
+//                        switch(e.getKeyCode()) {
+//                        case 'l':
+//                            vt.clear();
+//                            break;
+//                        default:
+//                        }
+//                    } else {
+//                        vt.addChar(e.getKeyChar());
+//                    }
+//                    frame.repaint();
                 }
                 @Override
                 public void keyPressed(KeyEvent e) {
