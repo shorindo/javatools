@@ -15,9 +15,12 @@
  */
 package com.shorindo.tools;
 
+import java.awt.Canvas;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Frame;
+import java.awt.GraphicsEnvironment;
+import java.awt.Panel;
 import java.awt.TextArea;
 import java.awt.TextField;
 import java.awt.Toolkit;
@@ -47,7 +50,7 @@ import org.mozilla.javascript.tools.shell.Main;
  */
 public class RhinoShell extends WindowAdapter {
     private static final String PROMPT = "rhino> ";
-    private static final String FONT_NAME = "ＭＳ　ゴシック";
+    private static final String FONT_NAME = "ＭＳ ゴシック";
     private TextArea textArea;
     private TextField textField;
     private InputStream in;

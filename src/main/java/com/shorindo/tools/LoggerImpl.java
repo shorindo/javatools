@@ -15,34 +15,31 @@
  */
 package com.shorindo.tools;
 
+import java.text.MessageFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
 /**
  * 
  */
 public class LoggerImpl extends Logger {
     private Class<?> clazz;
+    private String className;
     
     protected LoggerImpl(Class<?> clazz) {
         this.clazz = clazz;
-    }
-
-    private void log(Level level, String message) {
-        // TODO Auto-generated method stub
-        
+        className = clazz.getSimpleName();
     }
 
     private void log(Level level, String message, Object... params) {
-        // TODO Auto-generated method stub
-        
-    }
-
-    private void log(Level level, String message, Throwable th) {
-        // TODO Auto-generated method stub
-        
+    	String now = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new Date());
+    	MessageFormat format = new MessageFormat(message);
+        System.out.println(now + " [" + level + "] " + className + " - " + format.format(params));
     }
 
     private void log(Level level, String message, Throwable th, Object... params) {
-        // TODO Auto-generated method stub
-        
+    	log(level, message, params);
+    	th.printStackTrace(System.out);
     }
 
     @Override

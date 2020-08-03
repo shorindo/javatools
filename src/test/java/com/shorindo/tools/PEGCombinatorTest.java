@@ -31,17 +31,17 @@ import com.shorindo.tools.PEGCombinator.UnmatchException;
  */
 public class PEGCombinatorTest {
 
-    private BacktrackInputStream createStream(String text) {
-        return new BacktrackInputStream(new ByteArrayInputStream(text.getBytes()));
-    }
+//    private BacktrackInputStream createStream(String text) {
+//        return new BacktrackInputStream(new ByteArrayInputStream(text.getBytes()));
+//    }
 
     @Test
     public void testAny() throws Exception {
         PEGCombinator comb = new PEGCombinator();
-        BacktrackInputStream bis = createStream("abc");
-        Node node = comb.rule("ANY")
-            .define(comb.rule$Any())
-            .accept(bis);
+        PEGContext ctx = comb.createContext("abc");
+        PEGNode node = comb
+            .define("ANY", comb.rule$Any())
+            .accept(ctx);
         assertEquals("a", node.getSource());
     }
 
