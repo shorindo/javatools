@@ -26,6 +26,7 @@ import org.apache.sshd.client.session.ClientSession;
  * 
  */
 public class TerminalSSH {
+
     public static void main(String[] args) {
         Terminal terminal = new Terminal("UTF-8", 80, 25);
         try{
@@ -33,7 +34,7 @@ public class TerminalSSH {
             String user = "user";
             String host = "host";
             String passwd = "password";
-            int port = 443;
+            int port = 22;
             Long timeout = 10000L;
             client.start();
             ClientSession session = client.connect(user, host, port).verify(timeout).getSession();

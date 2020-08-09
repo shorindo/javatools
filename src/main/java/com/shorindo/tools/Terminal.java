@@ -58,7 +58,7 @@ public class Terminal {
                     while ((c = screenReader.read()) != -1) {
                         //LOG.debug("run(" + (char)c + ")");
                         switch (c) {
-                        case 0x1b: state1(); break;
+                        case 0x1b: push(c); state1(); break;
                         case '\b': cmd_dc(); break;
                         case '\r': cmd_cr(); break;
                         case '\n': cmd_do(); break;
@@ -198,11 +198,26 @@ public class Terminal {
         }
     }
 
+    /** N文字削除する */
+    protected void cmd_DC(int n) {
+        LOG.debug("cmd_DC(" + n + ")");
+        for (int i = 0; i < n; i++) {
+        	cmd_dc();
+        }
+    }
+
     /** 一行削除する */
     protected void cmd_dl() {
         LOG.debug("cmd_dl()");
     }
 
+    /** N行削除する */
+    protected void cmd_DL(int n) {
+        LOG.debug("cmd_DL(" + n + ")");
+        for (int i = 0; i < n; i++) {
+        	cmd_dl();
+        }
+    }
 
     /** カーソルを一行下げる */
     protected void cmd_do() {
@@ -212,6 +227,14 @@ public class Terminal {
         } else {
             cmd_cs(1, rows);
             buffer[rows - 1] = new char[cols];
+        }
+    }
+
+    /** カーソルをN行下げる */
+    protected void cmd_DO(int n) {
+        LOG.debug("cmd_DO(" + n + ")");
+        for (int i = 0; i < n; i++) {
+        	cmd_do();
         }
     }
 
@@ -335,29 +358,61 @@ public class Terminal {
     /** us   下線モード開始 */
     protected void cmd_us() {
     }
+    
+    protected void cmd_unknown() {
+    	LOG.error("UNKNOWN:" + seqbuffer);
+    	for (int c : seqbuffer) {
+    		put((char)c);
+    	}
+    	seqbuffer.clear();
+    }
+
+    List<Character> seqbuffer = new ArrayList<>();
+    List<Character> numbuffer = new ArrayList<>();
+    List<Integer> params = new ArrayList<>();
+
+    private void push(int c) {
+    	seqbuffer.add((char)c);
+    }
 
     /** ESC */
     private void state1() throws IOException {
         int c = screenReader.read();
+        push(c);
         switch (c) {
         case '[': state2(); break;
-        default:
+        default: cmd_unknown();
         }
     }
 
     /** ESC '[' */
     private void state2() throws IOException {
         int c = screenReader.read();
+        push(c);
         switch (c) {
-        case '2': state6(); break;
-        case '3': state7(); break;
-        case '4': state8(); break;
+        case '0': case '1': 
+        case '5': case '6': case '7': case '8': case '9':
+        	numbuffer.add((char)c);
+        	state9();
+        	break;
+        case '2':
+        	numbuffer.add((char)c);
+        	state6();
+        	break;
+        case '3':
+        	numbuffer.add((char)c);
+        	state7();
+        	break;
+        case '4':
+        	numbuffer.add((char)c);
+        	state8();
+        	break;
         case 'H': cmd_ho(); break;
         case 'J': cmd_cd(); break;
         case 'K': cmd_ce(); break;
         case 'M': cmd_dl(); break;
         case 'P': cmd_dc(); break;
-        default:
+        default: cmd_unknown();
         }		
     }
 
@@ -391,29 +446,130 @@ public class Terminal {
     /** ESC '[' 'H' ESC '[' '2' */
     private void state6() throws IOException {
         int c = screenReader.read();
+        push(c);
         switch (c) {
-        case 'J': cmd_cl(); break;
-        default:
+        case '0': case '1': case '2': case '3': case '4':
+        case '5': case '6': case '7': case '8': case '9':
+        	numbuffer.add((char)c);
+        	break;
+        case 'L':
+        	cmd_AL(createParam());
+        	break;
+        case 'P':
+        	cmd_DC(createParam());
+        	break;
+        case 'M':
+        	cmd_DL(createParam());
+        	break;
+        case 'B':
+        	cmd_DO(createParam());
+        	break;
+        case 'J':
+        	cmd_cl();
+        	break;
+        case ';':
+        	state10();
+        	break;
+        default: cmd_unknown();
         }		
     }
 
     /** ESC '[' '3' */
     private void state7() throws IOException {
         int c = screenReader.read();
+        push(c);
         switch (c) {
+        case '0': case '1': case '2': case '3': case '4':
+        case '5': case '6': case '7': case '8': case '9':
+        	numbuffer.add((char)c);
+        	break;
         case 'g': cmd_ct(); break;
-        default:
+        case 'L':
+        case 'P':
+        case 'M':
+        case 'B':
+        	break;
+        default: cmd_unknown();
         }
     }
 
     /** ESC '[' '4' */
     private void state8() throws IOException {
-        int c = screenReader.read();
+    	int c = screenReader.read();
+    	push(c);
         switch (c) {
+        case '0': case '1': case '2': case '3': case '4':
+        case '5': case '6': case '7': case '8': case '9':
+        	numbuffer.add((char)c);
+        	break;
         case 'h': cmd_im(); break;
         case 'l': cmd_ei(); break;
-        default:
+        case 'L':
+        case 'P':
+        case 'M':
+        case 'B':
+        	break;
+        default: cmd_unknown();
         }
+    }
+    
+    /** ESC '[' %d */
+    private void state9() throws IOException {
+    	int c = screenReader.read();
+    	push(c);
+        switch (c) {
+        case '0': case '1': case '2': case '3': case '4':
+        case '5': case '6': case '7': case '8': case '9':
+        	break;
+        case 'A':
+        case 'C':
+        case 'D':
+        case 'L':
+        case 'P':
+        case 'M':
+        case 'B':
+        	break;
+        case ';':
+        default: cmd_unknown();
+        }
+    }
+    
+    /** ESC '[' %d ';' */
+    private void state10() throws IOException {
+    	int c = screenReader.read();
+    	push(c);
+        switch (c) {
+        case '0': case '1': case '2': case '3': case '4':
+        case '5': case '6': case '7': case '8': case '9':
+        	createParam();
+        	numbuffer.clear();
+        	numbuffer.add((char)c);
+        	state11();
+        	break;
+        default: cmd_unknown();
+        }
+    }
+    
+    /** ESC '[' %d ';' %d */
+    private void state11() throws IOException {
+    	int c = screenReader.read();
+    	push(c);
+        switch (c) {
+        case '0': case '1': case '2': case '3': case '4':
+        case '5': case '6': case '7': case '8': case '9':
+        	numbuffer.add((char)c);
+        	state11();
+        	break;
+        default: cmd_unknown();
+        }
+    }
+    
+    private int createParam() {
+    	int result = 0;
+    	for (char c : numbuffer) {
+    		result += c - '0' + result * 10;
+    	}
+    	return result;
     }
 
     private TCanvas canvas;
