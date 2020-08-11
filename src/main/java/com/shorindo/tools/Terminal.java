@@ -163,6 +163,11 @@ public class Terminal {
 
     /** 画面上の %1 行、 %2 桁へカーソルを移動 */
     protected void cmd_cm(int row, int col) {
+    	LOG.debug("cmd_cm(" + row + ", " + col + ")");
+    	if (row >= rows) row = rows - 1;
+    	else if (row < 1) row = 1;
+    	if (col >= cols) col = cols - 1;
+    	else if (col < 1) col = 1;
         this.cr = row - 1;
         this.cc = col - 1;
     }
@@ -278,35 +283,67 @@ public class Terminal {
     protected void cmd_ku() {
     }
 
-    /** le   カーソルを左へ一文字分移動する */
+    /** カーソルを左へ一文字分移動する */
     protected void cmd_le() {
         LOG.debug("cmd_le()");
-        cc -= 1;
+        if (cc > 0) {
+        	cc -= 1;
+        }
+    }
+
+    /** カーソルを左へN文字分移動する */
+    protected void cmd_LE(int n) {
+        LOG.debug("cmd_LE(" + n + ")");
+        for (int i = 0; i < n; i++) {
+        	cmd_le();
+        }
     }
 
     /** md   bold モード開始 */
     protected void cmd_md() {
+    	LOG.debug("cmd_md()");
     }
 
     /** me   so, us, mb, md, mr などのモード全てを終了する */
     protected void cmd_me() {
+    	LOG.debug("cmd_me()");
     }
 
 
     /** mr   反転モード開始 */
     protected void cmd_mr() {
+    	LOG.debug("cmd_mr()");
     }
 
     /** nd   カーソルを右に一文字分移動 */
     protected void cmd_nd() {
+    	LOG.debug("cmd_nd()");
     }
 
     /** nw   復帰コマンド */
     protected void cmd_nw() {
+    	LOG.debug("cmd_nw()");
     }
 
     /** rc   保存しておいたカーソル位置に復帰する */
     protected void cmd_rc() {
+    	LOG.debug("cmd_rc()");
+    }
+
+    /** カーソルを右へ一文字分移動する */
+    protected void cmd_ri() {
+        LOG.debug("cmd_ri()");
+        if (cc < cols) {
+        	cc += 1;
+        }
+    }
+
+    /** カーソルを右へN文字分移動する */
+    protected void cmd_RI(int n) {
+        LOG.debug("cmd_RI(" + n + ")");
+        for (int i = 0; i < n; i++) {
+        	cmd_ri();
+        }
     }
 
     /** rs   リセット文字列 */
@@ -351,8 +388,17 @@ public class Terminal {
     protected void cmd_ue() {
     }
 
-    /** up   カーソルを 1 行分上に移動 */
+    /** カーソルを 1 行分上に移動 */
     protected void cmd_up() {
+    	if (cr < 1) cr = 0;
+    	else cr -= 1;
+    }
+
+    /** カーソルを N 行分上に移動 */
+    protected void cmd_UP(int n) {
+    	for (int i = 0; i < n; i++) {
+    		cmd_up();
+    	}
     }
 
     /** us   下線モード開始 */
@@ -365,6 +411,8 @@ public class Terminal {
     		put((char)c);
     	}
     	seqbuffer.clear();
+    	numbuffer.clear();
+    	params.clear();
     }
 
     List<Character> seqbuffer = new ArrayList<>();
@@ -373,6 +421,7 @@ public class Terminal {
 
     private void push(int c) {
     	seqbuffer.add((char)c);
+    	//LOG.debug("push(" + seqbuffer + ")");
     }
 
     /** ESC */
@@ -390,10 +439,14 @@ public class Terminal {
         int c = screenReader.read();
         push(c);
         switch (c) {
-        case '0': case '1': 
+        case '0': 
         case '5': case '6': case '7': case '8': case '9':
         	numbuffer.add((char)c);
         	state9();
+        	break;
+        case '1': 
+        	numbuffer.add((char)c);
+        	state11();
         	break;
         case '2':
         	numbuffer.add((char)c);
@@ -407,11 +460,26 @@ public class Terminal {
         	numbuffer.add((char)c);
         	state8();
         	break;
-        case 'H': cmd_ho(); break;
-        case 'J': cmd_cd(); break;
-        case 'K': cmd_ce(); break;
-        case 'M': cmd_dl(); break;
-        case 'P': cmd_dc(); break;
+        case 'H':
+        	cmd_ho();
+        	seqbuffer.clear();
+        	break;
+        case 'J':
+        	cmd_cd();
+        	seqbuffer.clear();
+        	break;
+        case 'K':
+        	cmd_ce();
+        	seqbuffer.clear();
+        	break;
+        case 'M':
+        	cmd_dl();
+        	seqbuffer.clear();
+        	break;
+        case 'P':
+        	cmd_dc();
+        	seqbuffer.clear();
+        	break;
         default: cmd_unknown();
         }		
     }
@@ -443,7 +511,7 @@ public class Terminal {
 //		}		
 //	}
 
-    /** ESC '[' 'H' ESC '[' '2' */
+    /** ESC '[' '2' */
     private void state6() throws IOException {
         int c = screenReader.read();
         push(c);
@@ -451,23 +519,35 @@ public class Terminal {
         case '0': case '1': case '2': case '3': case '4':
         case '5': case '6': case '7': case '8': case '9':
         	numbuffer.add((char)c);
+        	state9();
+        	break;
+        case 'A':
+        	cmd_UP(createParam());
         	break;
         case 'L':
         	cmd_AL(createParam());
+        	seqbuffer.clear();
         	break;
         case 'P':
         	cmd_DC(createParam());
+        	seqbuffer.clear();
         	break;
         case 'M':
         	cmd_DL(createParam());
+        	seqbuffer.clear();
         	break;
         case 'B':
         	cmd_DO(createParam());
+        	seqbuffer.clear();
         	break;
         case 'J':
         	cmd_cl();
+        	numbuffer.clear();
+        	seqbuffer.clear();
         	break;
         case ';':
+        	params.add(createParam());
+        	numbuffer.clear();
         	state10();
         	break;
         default: cmd_unknown();
@@ -482,12 +562,31 @@ public class Terminal {
         case '0': case '1': case '2': case '3': case '4':
         case '5': case '6': case '7': case '8': case '9':
         	numbuffer.add((char)c);
+        	state9();
         	break;
         case 'g': cmd_ct(); break;
+        case 'A':
+        	cmd_UP(createParam());
+        	break;
         case 'L':
+        	cmd_AL(createParam());
+        	seqbuffer.clear();
+        	break;
         case 'P':
+        	cmd_DC(createParam());
+        	seqbuffer.clear();
+        	break;
         case 'M':
+        	cmd_DL(createParam());
+        	seqbuffer.clear();
+        	break;
         case 'B':
+        	cmd_DO(createParam());
+        	seqbuffer.clear();
+        	break;
+        case ';':
+        	params.add(createParam());
+        	state10();
         	break;
         default: cmd_unknown();
         }
@@ -501,13 +600,32 @@ public class Terminal {
         case '0': case '1': case '2': case '3': case '4':
         case '5': case '6': case '7': case '8': case '9':
         	numbuffer.add((char)c);
+        	state9();
         	break;
         case 'h': cmd_im(); break;
         case 'l': cmd_ei(); break;
+        case 'A':
+        	cmd_UP(createParam());
+        	break;
         case 'L':
+        	cmd_AL(createParam());
+        	seqbuffer.clear();
+        	break;
         case 'P':
+        	cmd_DC(createParam());
+        	seqbuffer.clear();
+        	break;
         case 'M':
+        	cmd_DL(createParam());
+        	seqbuffer.clear();
+        	break;
         case 'B':
+        	cmd_DO(createParam());
+        	seqbuffer.clear();
+        	break;
+        case ';':
+        	params.add(createParam());
+        	state10();
         	break;
         default: cmd_unknown();
         }
@@ -520,16 +638,34 @@ public class Terminal {
         switch (c) {
         case '0': case '1': case '2': case '3': case '4':
         case '5': case '6': case '7': case '8': case '9':
+        	numbuffer.add((char)c);
+        	state9();
         	break;
         case 'A':
-        case 'C':
-        case 'D':
-        case 'L':
-        case 'P':
-        case 'M':
+        	cmd_UP(createParam());
+        	break;
         case 'B':
+        	cmd_DO(createParam());
+        	break;
+        case 'C':
+        	cmd_RI(createParam());
+        	break;
+        case 'D':
+        	cmd_LE(createParam());
+        	break;
+        case 'L':
+        	cmd_AL(createParam());
+        	break;
+        case 'P':
+        	cmd_DC(createParam());
+        	break;
+        case 'M':
+        	cmd_unknown();
         	break;
         case ';':
+        	params.add(createParam());
+        	state10();
+        	break;
         default: cmd_unknown();
         }
     }
@@ -541,16 +677,31 @@ public class Terminal {
         switch (c) {
         case '0': case '1': case '2': case '3': case '4':
         case '5': case '6': case '7': case '8': case '9':
-        	createParam();
-        	numbuffer.clear();
         	numbuffer.add((char)c);
-        	state11();
+        	state10();
         	break;
-        default: cmd_unknown();
+        case 'H':
+        	int p = createParam();
+        	params.add(p);
+        	cmd_cm(params.get(0), params.get(1));
+        	numbuffer.clear();
+        	seqbuffer.clear();
+        	params.clear();
+        	break;
+        case 'r':
+        	p = createParam();
+        	params.add(p);
+        	cmd_cs(params.get(0), params.get(1));
+        	numbuffer.clear();
+        	seqbuffer.clear();
+        	params.clear();
+        	break;
+        default:
+        	cmd_unknown();
         }
     }
-    
-    /** ESC '[' %d ';' %d */
+
+    /** ESC '[' '1' */
     private void state11() throws IOException {
     	int c = screenReader.read();
     	push(c);
@@ -558,17 +709,48 @@ public class Terminal {
         case '0': case '1': case '2': case '3': case '4':
         case '5': case '6': case '7': case '8': case '9':
         	numbuffer.add((char)c);
-        	state11();
+        	state9();
         	break;
-        default: cmd_unknown();
+        case 'A':
+        	cmd_UP(createParam());
+        	break;
+        case 'B':
+        	cmd_DO(createParam());
+        	break;
+        case 'C':
+        	cmd_RI(createParam());
+        	break;
+        case 'D':
+        	cmd_LE(createParam());
+        	break;
+        case 'L':
+        	cmd_AL(createParam());
+        	break;
+        case 'P':
+        	cmd_DC(createParam());
+        	seqbuffer.clear();
+        	break;
+        case 'm':
+        	cmd_md();
+        	numbuffer.clear();
+        	seqbuffer.clear();
+        	params.clear();
+        	break;
+        case ';':
+        	params.add(createParam());
+        	state10();
+        	break;
+        default:
+        	cmd_unknown();
         }
     }
     
     private int createParam() {
     	int result = 0;
     	for (char c : numbuffer) {
-    		result += c - '0' + result * 10;
+    		result = (c - '0') + result * 10;
     	}
+    	numbuffer.clear();
     	return result;
     }
 

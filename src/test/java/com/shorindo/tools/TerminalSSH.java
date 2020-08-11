@@ -17,10 +17,13 @@ package com.shorindo.tools;
 
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.util.Map;
 
 import org.apache.sshd.client.SshClient;
 import org.apache.sshd.client.channel.ChannelShell;
 import org.apache.sshd.client.session.ClientSession;
+import org.apache.sshd.common.channel.PtyChannelConfigurationHolder;
+import org.apache.sshd.common.channel.PtyMode;
 
 /**
  * 
@@ -31,16 +34,17 @@ public class TerminalSSH {
         Terminal terminal = new Terminal("UTF-8", 80, 25);
         try{
             SshClient client = SshClient.setUpDefaultClient();
-            String user = "user";
-            String host = "host";
-            String passwd = "password";
-            int port = 22;
+            String host = args[0];
+            String user = args[1];
+            String passwd = args[2];
+            int port = Integer.parseInt(args[3]);
             Long timeout = 10000L;
             client.start();
             ClientSession session = client.connect(user, host, port).verify(timeout).getSession();
             session.addPasswordIdentity(passwd);
             session.auth().verify(timeout);
             ChannelShell shell = session.createShellChannel();
+            shell.setPtyType("xterm");
             PipedInputStream tin = new PipedInputStream();
             PipedOutputStream tout = new PipedOutputStream(tin);
             terminal.setOut(tout);
