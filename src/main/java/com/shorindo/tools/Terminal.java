@@ -484,33 +484,6 @@ public class Terminal {
         }		
     }
 
-//	/** ESC '[' '2' */
-//	private void state3() throws IOException {
-//		int c = screenReader.read();
-//		switch (c) {
-//		case 0x1b: state4(); break;
-//		default:
-//		}		
-//	}
-//
-//	/** ESC '[' 'H' ESC */
-//	private void state4() throws IOException {
-//		int c = screenReader.read();
-//		switch (c) {
-//		case '[': state5(); break;
-//		default:
-//		}		
-//	}
-//
-//	/** ESC '[' 'H' ESC '[' */
-//	private void state5() throws IOException {
-//		int c = screenReader.read();
-//		switch (c) {
-//		case '2': state6(); break;
-//		default:
-//		}		
-//	}
-
     /** ESC '[' '2' */
     private void state6() throws IOException {
         int c = screenReader.read();
