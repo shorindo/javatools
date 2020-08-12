@@ -20,19 +20,26 @@ import java.awt.font.TextHitInfo;
 import java.awt.im.InputContext;
 import java.awt.im.InputMethodRequests;
 import java.io.ByteArrayOutputStream;
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.PushbackReader;
+import java.io.Reader;
 import java.io.UnsupportedEncodingException;
 import java.text.AttributedCharacterIterator;
 import java.text.AttributedCharacterIterator.Attribute;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.Stack;
 import java.util.stream.Collectors;
 
 import com.shorindo.tools.Termcap.Edge;
@@ -68,15 +75,7 @@ public class Terminal {
                 try {
                     while ((c = screenReader.read()) != -1) {
                         //LOG.debug("run(" + (char)c + ")");
-                    	machine.write(c);
-//                        switch (c) {
-//                        case 0x1b: push(c); state1(); break;
-//                        case '\b': cmd_dc(); break;
-//                        case '\r': cmd_cr(); break;
-//                        case '\n': cmd_do(); break;
-//                        case '\t': cmd_ta(); break; 
-//                        default: put((char)c);
-//                        }
+                        machine.write(c);
                     }
                 } catch (IOException e) {
                     LOG.error(e.getMessage(), e);
@@ -146,23 +145,28 @@ public class Terminal {
 
     /** １行挿入 */
     protected void cmd_al() {
+        LOG.debug("cmd_al");
     }
 
     /** N行挿入 */
     protected void cmd_AL(int n) {
+        LOG.debug("cmd_AL(" + n + ")");
     }
 
     /** ベルを鳴らす */
     protected void cmd_bl() {
+        LOG.debug("cmd_bl()");
     }
 
 
     /** 画面の最後までクリア */
     protected void cmd_cd() {
+        LOG.debug("cmd_cd()");
     }
 
     /** 行の最後までクリア */
     protected void cmd_ce() {
+        LOG.debug("cmd_ce()");
     }
 
     /** 画面を消去し、カーソルをホームポジションへ */
@@ -175,11 +179,11 @@ public class Terminal {
 
     /** 画面上の %1 行、 %2 桁へカーソルを移動 */
     protected void cmd_cm(int row, int col) {
-    	LOG.debug("cmd_cm(" + row + ", " + col + ")");
-    	if (row >= rows) row = rows - 1;
-    	else if (row < 1) row = 1;
-    	if (col >= cols) col = cols - 1;
-    	else if (col < 1) col = 1;
+        LOG.debug("cmd_cm(" + row + ", " + col + ")");
+        if (row >= rows) row = rows - 1;
+        else if (row < 1) row = 1;
+        if (col >= cols) col = cols - 1;
+        else if (col < 1) col = 1;
         this.cr = row - 1;
         this.cc = col - 1;
     }
@@ -203,6 +207,7 @@ public class Terminal {
 
     /** タブの消去 */
     protected void cmd_ct() {
+        LOG.debug("cmd_ct()");
     }
 
 
@@ -257,18 +262,22 @@ public class Terminal {
 
     /** intert モード終了 */
     protected void cmd_ei() {
+        LOG.debug("cmd_ei()");
     }
 
     /** カーソルをホームポジションに移動 */
     protected void cmd_ho() {
+        LOG.debug("cmd_ho");
     }
 
     /** insert モード開始 */
     protected void cmd_im() {
+        LOG.debug("cmd_im()");
     }
 
     /** バックスペースキー */
     protected void cmd_kb() {
+        LOG.debug("cmd_kb");
     }
 
     /** kd   下カーソルキー */
@@ -299,7 +308,7 @@ public class Terminal {
     protected void cmd_le() {
         LOG.debug("cmd_le()");
         if (cc > 0) {
-        	cc -= 1;
+            cc -= 1;
         }
     }
 
@@ -307,46 +316,46 @@ public class Terminal {
     protected void cmd_LE(int n) {
         LOG.debug("cmd_LE(" + n + ")");
         for (int i = 0; i < n; i++) {
-        	cmd_le();
+            cmd_le();
         }
     }
 
     /** md   bold モード開始 */
     protected void cmd_md() {
-    	LOG.debug("cmd_md()");
+        LOG.debug("cmd_md()");
     }
 
     /** me   so, us, mb, md, mr などのモード全てを終了する */
     protected void cmd_me() {
-    	LOG.debug("cmd_me()");
+        LOG.debug("cmd_me()");
     }
 
 
     /** mr   反転モード開始 */
     protected void cmd_mr() {
-    	LOG.debug("cmd_mr()");
+        LOG.debug("cmd_mr()");
     }
 
     /** nd   カーソルを右に一文字分移動 */
     protected void cmd_nd() {
-    	LOG.debug("cmd_nd()");
+        LOG.debug("cmd_nd()");
     }
 
     /** nw   復帰コマンド */
     protected void cmd_nw() {
-    	LOG.debug("cmd_nw()");
+        LOG.debug("cmd_nw()");
     }
 
     /** rc   保存しておいたカーソル位置に復帰する */
     protected void cmd_rc() {
-    	LOG.debug("cmd_rc()");
+        LOG.debug("cmd_rc()");
     }
 
     /** カーソルを右へ一文字分移動する */
     protected void cmd_ri() {
         LOG.debug("cmd_ri()");
         if (cc < cols) {
-        	cc += 1;
+            cc += 1;
         }
     }
 
@@ -354,32 +363,38 @@ public class Terminal {
     protected void cmd_RI(int n) {
         LOG.debug("cmd_RI(" + n + ")");
         for (int i = 0; i < n; i++) {
-        	cmd_ri();
+            cmd_ri();
         }
     }
 
     /** rs   リセット文字列 */
     protected void cmd_rs() {
+        LOG.debug("cmd_rs()");
     }
 
     /** sc   カーソル位置を保存する */
     protected void cmd_sc() {
+        LOG.debug("cmd_sc()");
     }
 
     /** se   強調モード終了 */
     protected void cmd_se() {
+        LOG.debug("cmd_se()");
     }
 
     /** sf   順方向の 1 行スクロール */
     protected void cmd_sf() {
+        LOG.debug("cmd_sf()");
     }
 
     /** so   強調モード開始 */
     protected void cmd_so() {
+        LOG.debug("cmd_so()");
     }
 
     /** sr   逆スクロール */
     protected void cmd_sr() {
+        LOG.debug("cmd_sr()");
     }
 
     /** ta   次のハードウェアタブ位置へ移動 */
@@ -390,357 +405,41 @@ public class Terminal {
 
     /** te   カーソル移動を用いるプログラムの終了 */
     protected void cmd_te() {
+        LOG.debug("cmd_te()");
     }
 
     /** ti   カーソル移動を用いるプログラムの開始 */
     protected void cmd_ti() {
+        LOG.debug("cmd_ti()");
     }
 
     /** ue   下線モード終了 */
     protected void cmd_ue() {
+        LOG.debug("cmd_ue()");
     }
 
     /** カーソルを 1 行分上に移動 */
     protected void cmd_up() {
-    	if (cr < 1) cr = 0;
-    	else cr -= 1;
+        LOG.debug("cmd_up()");
+        if (cr < 1) cr = 0;
+        else cr -= 1;
     }
 
     /** カーソルを N 行分上に移動 */
     protected void cmd_UP(int n) {
-    	for (int i = 0; i < n; i++) {
-    		cmd_up();
-    	}
+        LOG.debug("cmd_UP(" + n + ")");
+        for (int i = 0; i < n; i++) {
+            cmd_up();
+        }
     }
 
     /** us   下線モード開始 */
     protected void cmd_us() {
+        LOG.debug("cmd_us()");
     }
     
-    protected void cmd_unknown() {
-    	LOG.error("UNKNOWN:" + seqbuffer);
-    	for (int c : seqbuffer) {
-    		put((char)c);
-    	}
-    	seqbuffer.clear();
-    	numbuffer.clear();
-    	params.clear();
-    }
-
-    List<Character> seqbuffer = new ArrayList<>();
-    List<Character> numbuffer = new ArrayList<>();
-    List<Integer> params = new ArrayList<>();
-
-    private void push(int c) {
-    	seqbuffer.add((char)c);
-    	//LOG.debug("push(" + seqbuffer + ")");
-    }
-
-    /** ESC */
-    private void state1() throws IOException {
-        int c = screenReader.read();
-        push(c);
-        switch (c) {
-        case '[': state2(); break;
-        default: cmd_unknown();
-        }
-    }
-
-    /** ESC '[' */
-    private void state2() throws IOException {
-        int c = screenReader.read();
-        push(c);
-        switch (c) {
-        case '0': 
-        case '5': case '6': case '7': case '8': case '9':
-        	numbuffer.add((char)c);
-        	state9();
-        	break;
-        case '1': 
-        	numbuffer.add((char)c);
-        	state11();
-        	break;
-        case '2':
-        	numbuffer.add((char)c);
-        	state6();
-        	break;
-        case '3':
-        	numbuffer.add((char)c);
-        	state7();
-        	break;
-        case '4':
-        	numbuffer.add((char)c);
-        	state8();
-        	break;
-        case 'H':
-        	cmd_ho();
-        	seqbuffer.clear();
-        	break;
-        case 'J':
-        	cmd_cd();
-        	seqbuffer.clear();
-        	break;
-        case 'K':
-        	cmd_ce();
-        	seqbuffer.clear();
-        	break;
-        case 'M':
-        	cmd_dl();
-        	seqbuffer.clear();
-        	break;
-        case 'P':
-        	cmd_dc();
-        	seqbuffer.clear();
-        	break;
-        default: cmd_unknown();
-        }		
-    }
-
-    /** ESC '[' '2' */
-    private void state6() throws IOException {
-        int c = screenReader.read();
-        push(c);
-        switch (c) {
-        case '0': case '1': case '2': case '3': case '4':
-        case '5': case '6': case '7': case '8': case '9':
-        	numbuffer.add((char)c);
-        	state9();
-        	break;
-        case 'A':
-        	cmd_UP(createParam());
-        	break;
-        case 'L':
-        	cmd_AL(createParam());
-        	seqbuffer.clear();
-        	break;
-        case 'P':
-        	cmd_DC(createParam());
-        	seqbuffer.clear();
-        	break;
-        case 'M':
-        	cmd_DL(createParam());
-        	seqbuffer.clear();
-        	break;
-        case 'B':
-        	cmd_DO(createParam());
-        	seqbuffer.clear();
-        	break;
-        case 'J':
-        	cmd_cl();
-        	numbuffer.clear();
-        	seqbuffer.clear();
-        	break;
-        case ';':
-        	params.add(createParam());
-        	numbuffer.clear();
-        	state10();
-        	break;
-        default: cmd_unknown();
-        }		
-    }
-
-    /** ESC '[' '3' */
-    private void state7() throws IOException {
-        int c = screenReader.read();
-        push(c);
-        switch (c) {
-        case '0': case '1': case '2': case '3': case '4':
-        case '5': case '6': case '7': case '8': case '9':
-        	numbuffer.add((char)c);
-        	state9();
-        	break;
-        case 'g': cmd_ct(); break;
-        case 'A':
-        	cmd_UP(createParam());
-        	break;
-        case 'L':
-        	cmd_AL(createParam());
-        	seqbuffer.clear();
-        	break;
-        case 'P':
-        	cmd_DC(createParam());
-        	seqbuffer.clear();
-        	break;
-        case 'M':
-        	cmd_DL(createParam());
-        	seqbuffer.clear();
-        	break;
-        case 'B':
-        	cmd_DO(createParam());
-        	seqbuffer.clear();
-        	break;
-        case ';':
-        	params.add(createParam());
-        	state10();
-        	break;
-        default: cmd_unknown();
-        }
-    }
-
-    /** ESC '[' '4' */
-    private void state8() throws IOException {
-    	int c = screenReader.read();
-    	push(c);
-        switch (c) {
-        case '0': case '1': case '2': case '3': case '4':
-        case '5': case '6': case '7': case '8': case '9':
-        	numbuffer.add((char)c);
-        	state9();
-        	break;
-        case 'h': cmd_im(); break;
-        case 'l': cmd_ei(); break;
-        case 'A':
-        	cmd_UP(createParam());
-        	break;
-        case 'L':
-        	cmd_AL(createParam());
-        	seqbuffer.clear();
-        	break;
-        case 'P':
-        	cmd_DC(createParam());
-        	seqbuffer.clear();
-        	break;
-        case 'M':
-        	cmd_DL(createParam());
-        	seqbuffer.clear();
-        	break;
-        case 'B':
-        	cmd_DO(createParam());
-        	seqbuffer.clear();
-        	break;
-        case ';':
-        	params.add(createParam());
-        	state10();
-        	break;
-        default: cmd_unknown();
-        }
-    }
-    
-    /** ESC '[' %d */
-    private void state9() throws IOException {
-    	int c = screenReader.read();
-    	push(c);
-        switch (c) {
-        case '0': case '1': case '2': case '3': case '4':
-        case '5': case '6': case '7': case '8': case '9':
-        	numbuffer.add((char)c);
-        	state9();
-        	break;
-        case 'A':
-        	cmd_UP(createParam());
-        	break;
-        case 'B':
-        	cmd_DO(createParam());
-        	break;
-        case 'C':
-        	cmd_RI(createParam());
-        	break;
-        case 'D':
-        	cmd_LE(createParam());
-        	break;
-        case 'L':
-        	cmd_AL(createParam());
-        	break;
-        case 'P':
-        	cmd_DC(createParam());
-        	break;
-        case 'M':
-        	cmd_unknown();
-        	break;
-        case ';':
-        	params.add(createParam());
-        	state10();
-        	break;
-        default: cmd_unknown();
-        }
-    }
-    
-    /** ESC '[' %d ';' */
-    private void state10() throws IOException {
-    	int c = screenReader.read();
-    	push(c);
-        switch (c) {
-        case '0': case '1': case '2': case '3': case '4':
-        case '5': case '6': case '7': case '8': case '9':
-        	numbuffer.add((char)c);
-        	state10();
-        	break;
-        case 'H':
-        	int p = createParam();
-        	params.add(p);
-        	cmd_cm(params.get(0), params.get(1));
-        	numbuffer.clear();
-        	seqbuffer.clear();
-        	params.clear();
-        	break;
-        case 'r':
-        	p = createParam();
-        	params.add(p);
-        	cmd_cs(params.get(0), params.get(1));
-        	numbuffer.clear();
-        	seqbuffer.clear();
-        	params.clear();
-        	break;
-        default:
-        	cmd_unknown();
-        }
-    }
-
-    /** ESC '[' '1' */
-    private void state11() throws IOException {
-    	int c = screenReader.read();
-    	push(c);
-        switch (c) {
-        case '0': case '1': case '2': case '3': case '4':
-        case '5': case '6': case '7': case '8': case '9':
-        	numbuffer.add((char)c);
-        	state9();
-        	break;
-        case 'A':
-        	cmd_UP(createParam());
-        	break;
-        case 'B':
-        	cmd_DO(createParam());
-        	break;
-        case 'C':
-        	cmd_RI(createParam());
-        	break;
-        case 'D':
-        	cmd_LE(createParam());
-        	break;
-        case 'L':
-        	cmd_AL(createParam());
-        	break;
-        case 'P':
-        	cmd_DC(createParam());
-        	seqbuffer.clear();
-        	break;
-        case 'm':
-        	cmd_md();
-        	numbuffer.clear();
-        	seqbuffer.clear();
-        	params.clear();
-        	break;
-        case ';':
-        	params.add(createParam());
-        	state10();
-        	break;
-        default:
-        	cmd_unknown();
-        }
-    }
-    
-    private int createParam() {
-    	int result = 0;
-    	for (char c : numbuffer) {
-    		result = (c - '0') + result * 10;
-    	}
-    	numbuffer.clear();
-    	return result;
-    }
-
     private TCanvas canvas;
-    private OutputStream os = new ByteArrayOutputStream();
+    //private OutputStream os = new ByteArrayOutputStream();
     private static Dimension bbox = new Dimension();
     
     public void window() {
@@ -827,10 +526,12 @@ public class Terminal {
     }
 
     private static class TFrame extends Frame {
+        private static final long serialVersionUID = 1L;
         
     }
     
     private static class TCanvas extends Canvas implements InputMethodRequests, InputMethodListener, TerminalEventListener {
+        private static final long serialVersionUID = 1L;
         private Graphics imageBuffer;
         private int width;
         private int height;
@@ -944,7 +645,7 @@ public class Terminal {
         @Override
         public void inputMethodTextChanged(InputMethodEvent event) {
             LOG.debug("inputMethodTextChanged(" + event + ")");
-            int committed = event.getCommittedCharacterCount();
+            //int committed = event.getCommittedCharacterCount();
             AttributedCharacterIterator iter = event.getText();
             if (iter != null) {
                 getGraphics().clearRect(0, 0, 800, 600);
@@ -999,7 +700,7 @@ public class Terminal {
     }
 
     public static class StateMachine {
-    	private static int INCR_PARAM = 0x1FFFF;
+        //private static int INCR_PARAM = 0x1FFFF;
         private static int NUM_PARAM = 0x2FFFF;
         private List<Node> nodes;
         private List<Edge> edges;
@@ -1008,64 +709,79 @@ public class Terminal {
         private Terminal terminal;
 
         public StateMachine(Terminal terminal) {
-        	this.terminal = terminal;
+            this.terminal = terminal;
             nodes = new ArrayList<>();
             edges = new ArrayList<>();
             start = new Node(0);
             curr = start;
             nodes.add(start);
-
-        	define("AL", new int[] { 0x1b, '[', NUM_PARAM, 'L' });
-        	define("DC", new int[] { 0x1b, '[', NUM_PARAM, 'P' });
-        	define("DL", new int[] { 0x1b, '[', NUM_PARAM, 'M' });
-        	define("DO", new int[] { 0x1b, '[', NUM_PARAM, 'B' });
-        	define("LE", new int[] { 0x1b, '[', NUM_PARAM, 'D' });
-        	define("RI", new int[] { 0x1b, '[', NUM_PARAM, 'C' });
-        	define("UP", new int[] { 0x1b, '[', NUM_PARAM, 'A' });
-        	define("ae", new int[] { CTRL('O') });
-        	define("al", new int[] { 0x1b, '[', 'L' });
-        	define("as", new int[] { CTRL('N') });
-        	define("bl", new int[] { CTRL('G') });
-        	define("cd", new int[] { 0x1b, '[', 'J' });
-        	define("ce", new int[] { 0x1b, '[', 'K' });
-        	define("cl", new int[] { 0x1b, '[', 'H', 0x1b, '[', '2', 'J' });
-        	define("cm", new int[] { 0x1b, '[', NUM_PARAM, ';', NUM_PARAM, 'H' });
-        	define("cr", new int[] { '\r' });
-        	define("cs", new int[] { 0x1b, '[', NUM_PARAM, ';', NUM_PARAM, 'r' });
-        	define("ct", new int[] { 0x1b, '[', '3', 'g' });
-        	define("dc", new int[] { 0x1b, '[', 'P' });
-        	define("dl", new int[] { 0x1b, '[', 'M' });
-        	define("do", new int[] { '\n' });
-        	define("eA", new int[] { 0x1b, '[', ')', '0' });
-        	define("ei", new int[] { 0x1b, '[', '4', 'l' });
-        	//define("ho", new int[] { 0x1b, '[', 'H' });
-        	define("im", new int[] { 0x1b, '[', '4', 'h' });
+            
+            define("AL", new int[] { 0x1b, '[', NUM_PARAM, 'L' });
+            define("DC", new int[] { 0x1b, '[', NUM_PARAM, 'P' });
+            define("DL", new int[] { 0x1b, '[', NUM_PARAM, 'M' });
+            define("DO", new int[] { 0x1b, '[', NUM_PARAM, 'B' });
+            define("LE", new int[] { 0x1b, '[', NUM_PARAM, 'D' });
+            define("RI", new int[] { 0x1b, '[', NUM_PARAM, 'C' });
+            define("UP", new int[] { 0x1b, '[', NUM_PARAM, 'A' });
+            define("ae", new int[] { CTRL('O') });
+            define("al", new int[] { 0x1b, '[', 'L' });
+            define("as", new int[] { CTRL('N') });
+            define("bl", new int[] { CTRL('G') });
+            define("cd", new int[] { 0x1b, '[', 'J' });
+            define("ce", new int[] { 0x1b, '[', 'K' });
+            define("cl", new int[] { 0x1b, '[', 'H', 0x1b, '[', '2', 'J' });
+            define("cm", new int[] { 0x1b, '[', NUM_PARAM, ';', NUM_PARAM, 'H' });
+            define("cr", new int[] { '\r' });
+            define("cs", new int[] { 0x1b, '[', NUM_PARAM, ';', NUM_PARAM, 'r' });
+            define("ct", new int[] { 0x1b, '[', '3', 'g' });
+            define("dc", new int[] { 0x1b, '[', 'P' });
+            define("dl", new int[] { 0x1b, '[', 'M' });
+            define("do", new int[] { '\n' });
+            define("eA", new int[] { 0x1b, '[', ')', '0' });
+            define("ei", new int[] { 0x1b, '[', '4', 'l' });
+            //define("ho", new int[] { 0x1b, '[', 'H' });
+            define("im", new int[] { 0x1b, '[', '4', 'h' });
             //define("kd", new int[] { '\n' });
-        	define("le", new int[] { CTRL('H') });
-        	define("md", new int[] { 0x1b, '[', '1', 'm' });
-        	define("me", new int[] { 0x1b, '[', 'm' });
-        	define("ml", new int[] { 0x1b, 'l' });
-        	define("mr", new int[] { 0x1b, '[', '7', 'm' });
-        	define("mu", new int[] { 0x1b, 'm' });
-        	define("nd", new int[] { 0x1b, '[', 'C' });
-        	define("nw", new int[] { '\r', '\n' });
-        	define("rc", new int[] { 0x1b, '8' });
-        	define("rs", new int[] { 0x1b, '[', 'm', 0x1b, '?', '7', 'h', 0x1b, '[', '4', 'l', 0x1b, '>', 0x1b, '7', 0x1b, '[', 'r', 0x1b, '[', '1', ';', '3', ';', '4', ';', '6', 'l', 0x1b, '8' });
-        	define("sc", new int[] { 0x1b, '7' });
-        	define("se", new int[] { 0x1b, '[', 'm' });
-        	//define("sf", new int[] { '\n' });
-        	define("so", new int[] { 0x1b, '[', '7', 'm' });
-        	define("sr", new int[] { 0x1b, 'M' });
-        	define("ta", new int[] { CTRL('I') });
-        	define("te", new int[] { 0x1b, '[', '2', 'J', 0x1b, '[', '?', '4', '7', 'l', 0x1b, 'B' });
-        	define("ti", new int[] { 0x1b, '7', 0x1b, '[', '?', '4', '7', 'h' });
-        	define("ue", new int[] { 0x1b, '[', 'm' });
-        	define("up", new int[] { 0x1b, '[', 'A' });
-        	define("us", new int[] { 0x1b, '[', '4', 'm' });
+            define("ke", new int[] { 0x1b, '[', '?', '1', 'l', 0x1b, '>' });
+            define("ks", new int[] { 0x1b, '[', '?', '1', 'h', 0x1b, '=' });
+            define("le", new int[] { CTRL('H') });
+            define("md", new int[] { 0x1b, '[', '1', 'm' });
+            define("me", new int[] { 0x1b, '[', 'm' });
+            define("ml", new int[] { 0x1b, 'l' });
+            define("mr", new int[] { 0x1b, '[', '7', 'm' });
+            define("mu", new int[] { 0x1b, 'm' });
+            define("nd", new int[] { 0x1b, '[', 'C' });
+            define("nw", new int[] { '\r', '\n' });
+            define("rc", new int[] { 0x1b, '8' });
+            define("rs", new int[] { 0x1b, '[', 'm', 0x1b, '?', '7', 'h', 0x1b, '[', '4', 'l', 0x1b, '>', 0x1b, '7', 0x1b, '[', 'r', 0x1b, '[', '1', ';', '3', ';', '4', ';', '6', 'l', 0x1b, '8' });
+            define("sc", new int[] { 0x1b, '7' });
+            define("se", new int[] { 0x1b, '[', 'm' });
+            //define("sf", new int[] { '\n' });
+            define("so", new int[] { 0x1b, '[', '7', 'm' });
+            define("sr", new int[] { 0x1b, 'M' });
+            define("ta", new int[] { CTRL('I') });
+            define("te", new int[] { 0x1b, '[', '2', 'J', 0x1b, '[', '?', '4', '7', 'l', 0x1b, 'B' });
+            define("ti", new int[] { 0x1b, '7', 0x1b, '[', '?', '4', '7', 'h' });
+            define("ue", new int[] { 0x1b, '[', 'm' });
+            define("up", new int[] { 0x1b, '[', 'A' });
+            define("us", new int[] { 0x1b, '[', '4', 'm' });
+            
+            System.out.print(this);
+        }
+        
+        public void start(InputStream is) {
+            while (true) {
+                try {
+                    String cap = start.consume(is);
+                    LOG.debug("cap=" + cap);
+                } catch (IOException e) {
+                    break;
+                }
+            }
         }
 
         private static int CTRL(int c) {
-        	return c - 64;
+            return c - 64;
         }
 
         public void define(String action, int[] seq) {
@@ -1091,12 +807,14 @@ public class Terminal {
                 Edge edge = new Edge(source, target);
                 edge.setEvent(event);
                 edges.add(edge);
+                source.addEdge(edge);
                 dig(target, action, Arrays.copyOfRange(seq, 1, seq.length));
 
                 if (event == NUM_PARAM) {
                     edge = new Edge(target, target);
                     edge.setEvent(event);
                     edges.add(edge);
+                    target.addEdge(edge);
                 }
             }
         }
@@ -1139,191 +857,169 @@ public class Terminal {
                 })
                 .findFirst();
             if (optEdge.isPresent()) {
-            	if (optEdge.get().getEvent() == NUM_PARAM) {
+                if (optEdge.get().getEvent() == NUM_PARAM) {
                     numbuffer.add(c);
-            	} else if (numbuffer.size() > 0) {
+                } else if (numbuffer.size() > 0) {
                     int r = 0;
                     for (int i : numbuffer) {
                         r = r * 10 + (i - '0');
                     }
                     params.add(r);
                     numbuffer.clear();
-            	}
-            	curr = optEdge.get().getTarget();
+                }
+                curr = optEdge.get().getTarget();
                 if (curr.getAction() != null) {
-                	int p1, p2;
-                	switch (curr.getAction()) {
-                	case "AL":
-                		p1 = params.get(0);
-                		params.remove(0);
-                		terminal.cmd_AL(p1);
-                		break;
-                	case "DC":
-                		p1 = params.get(0);
-                		params.remove(0);
-                		terminal.cmd_DC(p1);
-                		break;
-                	case "DL":
-                		p1 = params.get(0);
-                		params.remove(0);
-                		terminal.cmd_DL(p1);
-                		break;
-                	case "DO":
-                		p1 = params.get(0);
-                		params.remove(0);
-                		terminal.cmd_DO(p1);
-                		break;
-                	case "LE":
-                		p1 = params.get(0);
-                		params.remove(0);
-                		terminal.cmd_LE(p1);
-                		break;
-                	case "RI":
-                		p1 = params.get(0);
-                		params.remove(0);
-                		terminal.cmd_RI(p1);
-                		break;
-                	case "UP":
-                		p1 = params.get(0);
-                		params.remove(0);
-                		terminal.cmd_UP(p1);
-                		break;
-                	case "ae":
-                		//terminal.cmd_ae();
-                		break;
-                	case "al":
-                		terminal.cmd_al();
-                		break;
-                	case "as":
-                		//terminal.cmd_as();
-                		break;
-                	case "bl":
-                		terminal.cmd_bl();
-                		break;
-                	case "cd":
-                		terminal.cmd_cd();
-                		break;
-                	case "ce":
-                		//terminal.cmd_ee();
-                		break;
-                	case "cl":
-                		terminal.cmd_cl();
-                		break;
-                	case "cm":
-                		p1 = params.get(0);
-                		p2 = params.get(1);
-                		params.remove(0);
-                		params.remove(0);
-                		terminal.cmd_cm(p1, p2);
-                		break;
-                	case "cr":
-                		terminal.cmd_cr();
-                		break;
-                	case "cs":
-                		p1 = params.get(0);
-                		p2 = params.get(1);
-                		params.remove(0);
-                		params.remove(0);
-                		terminal.cmd_cs(p1, p2);
-                		break;
-                	case "ct":
-                		terminal.cmd_ct();
-                		break;
-                	case "dc":
-                		terminal.cmd_dc();
-                		break;
-                	case "dl":
-                		terminal.cmd_dl();
-                		break;
-                	case "do":
-                		terminal.cmd_do();
-                		break;
-                	case "eA":
-                		//terminal.cmd_eA();
-                		break;
-                	case "ei":
-                		terminal.cmd_ei();
-                		break;
-                	case "im":
-                		terminal.cmd_im();
-                		break;
+                    switch (curr.getAction()) {
+                    case "AL":
+                        terminal.cmd_AL(params.poll());
+                        break;
+                    case "DC":
+                        terminal.cmd_DC(params.poll());
+                        break;
+                    case "DL":
+                        terminal.cmd_DL(params.poll());
+                        break;
+                    case "DO":
+                        terminal.cmd_DO(params.poll());
+                        break;
+                    case "LE":
+                        terminal.cmd_LE(params.poll());
+                        break;
+                    case "RI":
+                        terminal.cmd_RI(params.poll());
+                        break;
+                    case "UP":
+                        terminal.cmd_UP(params.poll());
+                        break;
+                    case "ae":
+                        //terminal.cmd_ae();
+                        break;
+                    case "al":
+                        terminal.cmd_al();
+                        break;
+                    case "as":
+                        //terminal.cmd_as();
+                        break;
+                    case "bl":
+                        terminal.cmd_bl();
+                        break;
+                    case "cd":
+                        terminal.cmd_cd();
+                        break;
+                    case "ce":
+                        //terminal.cmd_ee();
+                        break;
+                    case "cl":
+                        terminal.cmd_cl();
+                        break;
+                    case "cm":
+                        terminal.cmd_cm(params.poll(), params.poll());
+                        break;
+                    case "cr":
+                        terminal.cmd_cr();
+                        break;
+                    case "cs":
+                        terminal.cmd_cs(params.poll(), params.poll());
+                        break;
+                    case "ct":
+                        terminal.cmd_ct();
+                        break;
+                    case "dc":
+                        terminal.cmd_dc();
+                        break;
+                    case "dl":
+                        terminal.cmd_dl();
+                        break;
+                    case "do":
+                        terminal.cmd_do();
+                        break;
+                    case "eA":
+                        //terminal.cmd_eA();
+                        break;
+                    case "ei":
+                        terminal.cmd_ei();
+                        break;
+                    case "im":
+                        terminal.cmd_im();
+                        break;
                     case "kd":
-                    	terminal.cmd_kd();
-                		break;
-                	case "le":
-                		terminal.cmd_le();
-                		break;
-                	case "md":
-                		terminal.cmd_md();
-                		break;
-                	case "me":
-                		terminal.cmd_me();
-                		break;
-                	case "ml":
-                		//terminal.cmd_ml();
-                		break;
-                	case "mr":
-                		terminal.cmd_mr();
-                		break;
-                	case "mu":
-                		//terminal.cmd_mu();
-                		break;
-                	case "nd":
-                		terminal.cmd_nd();
-                		break;
-                	case "nw":
-                		terminal.cmd_nw();
-                		break;
-                	case "rc":
-                		terminal.cmd_rc();
-                		break;
-                	case "rs":
-                		terminal.cmd_rs();
-                		break;
-                	case "sc":
-                		terminal.cmd_sc();
-                		break;
-                	case "se":
-                		terminal.cmd_se();
-                		break;
-                	case "sf":
-                		terminal.cmd_sf();
-                		break;
-                	case "so":
-                		terminal.cmd_so();
-                		break;
-                	case "sr":
-                		terminal.cmd_sr();
-                		break;
-                	case "ta":
-                		terminal.cmd_ta();
-                		break;
-                	case "te":
-                		terminal.cmd_te();
-                		break;
-                	case "ti":
-                		terminal.cmd_ti();
-                		break;
-                	case "ue":
-                		terminal.cmd_ue();
-                		break;
-                	case "up":
-                		terminal.cmd_up();
-                		break;
-                	case "us":
-                		terminal.cmd_us();
-                		break;
-                	default:
-                		LOG.debug("cmd_" + curr.getAction() + "()");
-                		
-                	}
+                        terminal.cmd_kd();
+                        break;
+                    case "le":
+                        terminal.cmd_le();
+                        break;
+                    case "md":
+                        terminal.cmd_md();
+                        break;
+                    case "me":
+                        terminal.cmd_me();
+                        break;
+                    case "ml":
+                        //terminal.cmd_ml();
+                        break;
+                    case "mr":
+                        terminal.cmd_mr();
+                        break;
+                    case "mu":
+                        //terminal.cmd_mu();
+                        break;
+                    case "nd":
+                        terminal.cmd_nd();
+                        break;
+                    case "nw":
+                        terminal.cmd_nw();
+                        break;
+                    case "rc":
+                        terminal.cmd_rc();
+                        break;
+                    case "rs":
+                        terminal.cmd_rs();
+                        break;
+                    case "sc":
+                        terminal.cmd_sc();
+                        break;
+                    case "se":
+                        terminal.cmd_se();
+                        break;
+                    case "sf":
+                        terminal.cmd_sf();
+                        break;
+                    case "so":
+                        terminal.cmd_so();
+                        break;
+                    case "sr":
+                        terminal.cmd_sr();
+                        break;
+                    case "ta":
+                        terminal.cmd_ta();
+                        break;
+                    case "te":
+                        terminal.cmd_te();
+                        break;
+                    case "ti":
+                        terminal.cmd_ti();
+                        break;
+                    case "ue":
+                        terminal.cmd_ue();
+                        break;
+                    case "up":
+                        terminal.cmd_up();
+                        break;
+                    case "us":
+                        terminal.cmd_us();
+                        break;
+                    default:
+                        LOG.debug("UNKNOWN:" + curr.getAction());
+                        
+                    }
                     curr = start;
                     buffer.clear();
+                    params.clear();
                 }
             } else {
                 // バッファ + c を吐き出す
                 for (int b : buffer) {
-                	LOG.debug("put(" + (char)b + ")");
+                    //LOG.debug("put(" + (char)b + ")");
                     terminal.put((char)b);
                 }
                 curr = start;
@@ -1332,7 +1028,7 @@ public class Terminal {
         }
 
         private List<Integer> numbuffer = new ArrayList<>();
-        private List<Integer> params = new ArrayList<>();
+        private LinkedList<Integer> params = new LinkedList<>();
         private boolean match(int expect, int actual) {
             if (expect == NUM_PARAM && '0' <= actual && actual <= '9') {
                 return true;
@@ -1347,25 +1043,74 @@ public class Terminal {
             for (List<Node> path : findPath(start, visited)) {
                 // LOG.debug("path=" + path);
                 String sep = "";
-                Node last = null;
-                for (Node node : path) {
-                    sb.append(sep + node.getId());
-                    sep = " -> ";
-                    last = node;
+                Node prev = null;
+                Node next = null;
+                for (int i = 0; i < path.size(); i++) {
+                    next = path.get(i);
+                    for (int j = 0; j < edges.size(); j++) {
+                        Edge edge = edges.get(j);
+                        if (edge.getSource() == prev && edge.getTarget() == next) {
+                            sep = " -(" + conv(edge.getEvent()) + ")-> ";
+                            break;
+                        }
+                    }
+                    sb.append(sep + next.getId());
+                    prev = next;
                 }
-                sb.append(" : " + last.getAction());
+                sb.append(" : " + next.getAction());
                 sb.append("\n");
             }
             return sb.toString();
+        }
+        
+        private String conv(int c) {
+            switch (c) {
+            case ('O' - 64): return "^O";
+            case ('N' - 64): return "^N";
+            case ('G' - 64): return "^G";
+            case ('H' - 64): return "^H";
+            case '\t': return "\\t";
+            case '\r': return "\\r";
+            case '\n': return "\\n";
+            case 0x1b: return "ESC";
+            case 0x2FFFF: return "NUM";
+            default: return String.valueOf((char)c);
+            }
         }
     }
 
     public static class Node {
         private int id;
         private String action;
+        private Map<Integer,Node> targetMap;
 
         public Node(int id) {
             this.id = id;
+            this.targetMap = new HashMap<>();
+        }
+
+        public void addEdge(Edge edge) {
+            targetMap.put(edge.getEvent(), edge.getTarget());
+        }
+
+        public String consume(InputStream is) throws IOException {
+            if (action != null) {
+                return action;
+            }
+            int c = is.read();
+            Node next = targetMap.get(c);
+            if (next != null) {
+                return next.consume(is);
+            } else if ('0' <= c && c <= '9') {
+                next = targetMap.get(0x2FFFF);
+                if (next != null) {
+                    return next.consume(is);
+                } else {
+                    throw new IOException();
+                }
+            } else {
+                throw new IOException();
+            }
         }
 
         public int getId() {
@@ -1414,5 +1159,37 @@ public class Terminal {
         public String toString() {
             return "[" + source + ", " + target + "]";
         }
+    }
+    
+    public static class BacktrackReader extends Reader {
+        private PushbackReader reader;
+
+        public BacktrackReader(Reader in) {
+            this.reader = new PushbackReader(in, 1024);
+        }
+
+        @Override
+        public int read() throws IOException {
+            return -1;
+        }
+
+        public int mark() {
+            return 0;
+        }
+
+        public void reset() {
+        }
+
+        @Override
+        public int read(char[] cbuf, int off, int len) throws IOException {
+            // TODO Auto-generated method stub
+            return 0;
+        }
+
+        @Override
+        public void close() throws IOException {
+            // TODO Auto-generated method stub
+        }
+        
     }
 }

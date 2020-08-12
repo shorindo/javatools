@@ -56,7 +56,7 @@ public class TerminalSSH {
             shell.setErr(sout);
             shell.open();
         } catch(Exception e){
-            System.out.println(e);
+            e.printStackTrace();
         }
         terminal.start();
     }

@@ -9,25 +9,38 @@ import java.io.OutputStream;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import com.shorindo.tools.Terminal.StateMachine;
+
 public class TerminalTest {
-	private static final Logger LOG = Logger.getLogger(TerminalTest.class);
-	private static Terminal terminal;
+    private static final Logger LOG = Logger.getLogger(TerminalTest.class);
+    private static Terminal terminal;
 
-	@BeforeClass
-	public static void setup() {
-	}
+    @BeforeClass
+    public static void setup() {
+    }
 
-	@Test
-	public void test_cl() {
-		ByteArrayInputStream in = new ByteArrayInputStream(
-				new byte[] {
-						0x1b, '[', 'H',
-						0x1b, '[', '2', 'J'
-				});
-		terminal = new Terminal("UTF-8", 80, 25);
-		terminal.setIn(in);
-		terminal.start();
-	}
+    @Test
+    public void test_cl() {
+        ByteArrayInputStream in = new ByteArrayInputStream(
+            new byte[] {
+                0x1b, '[', 'H',
+                0x1b, '[', '2', 'J',
+                0x1b, '[', '1', 'm'
+            });
+        terminal = new Terminal("UTF-8", 80, 25);
+        terminal.setIn(in);
+        terminal.start();
+    }
+    
+    @Test
+    public void test_state_machine() {
+        StateMachine machine = new StateMachine(null);
+        ByteArrayInputStream bais = new ByteArrayInputStream(new byte[] {
+            //0x1b, '[', '1', 'm',
+            0x1b, '[', '3', 'A'
+        });
+        machine.start(bais);
+    }
 
 //	@Test
 //	public void testHalf() throws Exception {
