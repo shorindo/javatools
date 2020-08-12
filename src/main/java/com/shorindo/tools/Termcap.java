@@ -230,14 +230,39 @@ public class Termcap {
                 })
                 .findFirst();
             if (optEdge.isPresent()) {
-                curr = optEdge.get().getTarget();
+            	if (optEdge.get().getEvent() == 0x1FFFF) {
+                    numbuffer.add(c);
+            	} else if (numbuffer.size() > 0) {
+                    int r = 0;
+                    for (int i : numbuffer) {
+                        r = r * 10 + (i - '0');
+                    }
+                    params.add(r);
+                    numbuffer.clear();
+            	}
+            	curr = optEdge.get().getTarget();
                 if (curr.getAction() != null) {
-                    LOG.debug("cmd_" + curr.getAction() + "()");
+                	switch (curr.getAction()) {
+                	case "AL":
+                		int param = params.get(0);
+                		params.remove(0);
+                		LOG.debug("cmd_" + curr.getAction() + "(" + param + ")");
+                		break;
+                	case "cs": 
+                		int p1 = params.get(0);
+                		int p2 = params.get(1);
+                		params.remove(0);
+                		params.remove(0);
+                		LOG.debug("cmd_" + curr.getAction() + "(" + p1 + "," + p2 + ")");
+                		break;
+                	default:
+                		LOG.debug("cmd_" + curr.getAction() + "()");
+                	}
                     curr = start;
                     buffer.clear();
                 }
             } else {
-                // TODO バッファ + c を吐き出す
+                // バッファ + c を吐き出す
                 for (int b : buffer) {
                     LOG.debug("put(" + (char)b + ")");
                 }
@@ -250,17 +275,8 @@ public class Termcap {
         private List<Integer> params = new ArrayList<>();
         private boolean match(int expect, int actual) {
             if (expect == 0x1FFFF && '0' <= actual && actual <= '9') {
-                numbuffer.add(actual);
                 return true;
             } else {
-                if (numbuffer.size() > 0) {
-                    int r = 0;
-                    for (int i : numbuffer) {
-                        r = r * 10 + (i - '0');
-                    }
-                    params.add(r);
-                    numbuffer.clear();
-                }
                 return expect == actual;
             }
         }

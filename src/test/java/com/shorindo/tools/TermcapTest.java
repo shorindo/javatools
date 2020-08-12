@@ -76,10 +76,11 @@ public class TermcapTest {
         machine.write('L');
         machine.write(0x1b);
         machine.write('[');
-        machine.write('1');
+        machine.write('3');
         machine.write(';');
-        machine.write('2');
-        machine.write('r');
+        machine.write('4');
+        machine.write('5');
+        machine.write('H');
         
         System.out.println("");
     }

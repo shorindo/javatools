@@ -28,7 +28,16 @@ import java.io.UnsupportedEncodingException;
 import java.text.AttributedCharacterIterator;
 import java.text.AttributedCharacterIterator.Attribute;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import com.shorindo.tools.Termcap.Edge;
+import com.shorindo.tools.Termcap.Node;
+import com.shorindo.tools.Termcap.StateMachine;
 
 public class Terminal {
     private static final Logger LOG = Logger.getLogger(Terminal.class);
@@ -39,6 +48,7 @@ public class Terminal {
     private int rows;
     private int cols;
     private int cr, cc;
+    private StateMachine machine;
 
     public Terminal(String charset, int cols, int rows) {
         this.rows = rows;
@@ -47,6 +57,7 @@ public class Terminal {
         this.charset = charset;
         this.setIn(System.in);
         this.setOut(System.out);
+        this.machine = new StateMachine(this);
     }
     
     public void start() {
@@ -57,14 +68,15 @@ public class Terminal {
                 try {
                     while ((c = screenReader.read()) != -1) {
                         //LOG.debug("run(" + (char)c + ")");
-                        switch (c) {
-                        case 0x1b: push(c); state1(); break;
-                        case '\b': cmd_dc(); break;
-                        case '\r': cmd_cr(); break;
-                        case '\n': cmd_do(); break;
-                        case '\t': cmd_ta(); break; 
-                        default: put((char)c);
-                        }
+                    	machine.write(c);
+//                        switch (c) {
+//                        case 0x1b: push(c); state1(); break;
+//                        case '\b': cmd_dc(); break;
+//                        case '\r': cmd_cr(); break;
+//                        case '\n': cmd_do(); break;
+//                        case '\t': cmd_ta(); break; 
+//                        default: put((char)c);
+//                        }
                     }
                 } catch (IOException e) {
                     LOG.error(e.getMessage(), e);
@@ -754,7 +766,7 @@ public class Terminal {
 
             @Override
             public void keyPressed(KeyEvent e) {
-                LOG.debug("keyPressed(" + e + ")");
+                //LOG.debug("keyPressed(" + e + ")");
                 if (e.isControlDown() && e.getKeyCode() != 17) {
                     byte[] b = new byte[] { (byte)(e.getKeyCode() - 0x40) };
                     try {
@@ -984,5 +996,423 @@ public class Terminal {
 
     public interface TerminalEventListener {
         public void onEvent(TerminalEvent event);
+    }
+
+    public static class StateMachine {
+    	private static int INCR_PARAM = 0x1FFFF;
+        private static int NUM_PARAM = 0x2FFFF;
+        private List<Node> nodes;
+        private List<Edge> edges;
+        private Node start;
+        private Node curr;
+        private Terminal terminal;
+
+        public StateMachine(Terminal terminal) {
+        	this.terminal = terminal;
+            nodes = new ArrayList<>();
+            edges = new ArrayList<>();
+            start = new Node(0);
+            curr = start;
+            nodes.add(start);
+
+        	define("AL", new int[] { 0x1b, '[', NUM_PARAM, 'L' });
+        	define("DC", new int[] { 0x1b, '[', NUM_PARAM, 'P' });
+        	define("DL", new int[] { 0x1b, '[', NUM_PARAM, 'M' });
+        	define("DO", new int[] { 0x1b, '[', NUM_PARAM, 'B' });
+        	define("LE", new int[] { 0x1b, '[', NUM_PARAM, 'D' });
+        	define("RI", new int[] { 0x1b, '[', NUM_PARAM, 'C' });
+        	define("UP", new int[] { 0x1b, '[', NUM_PARAM, 'A' });
+        	define("ae", new int[] { CTRL('O') });
+        	define("al", new int[] { 0x1b, '[', 'L' });
+        	define("as", new int[] { CTRL('N') });
+        	define("bl", new int[] { CTRL('G') });
+        	define("cd", new int[] { 0x1b, '[', 'J' });
+        	define("ce", new int[] { 0x1b, '[', 'K' });
+        	define("cl", new int[] { 0x1b, '[', 'H', 0x1b, '[', '2', 'J' });
+        	define("cm", new int[] { 0x1b, '[', NUM_PARAM, ';', NUM_PARAM, 'H' });
+        	define("cr", new int[] { '\r' });
+        	define("cs", new int[] { 0x1b, '[', NUM_PARAM, ';', NUM_PARAM, 'r' });
+        	define("ct", new int[] { 0x1b, '[', '3', 'g' });
+        	define("dc", new int[] { 0x1b, '[', 'P' });
+        	define("dl", new int[] { 0x1b, '[', 'M' });
+        	define("do", new int[] { '\n' });
+        	define("eA", new int[] { 0x1b, '[', ')', '0' });
+        	define("ei", new int[] { 0x1b, '[', '4', 'l' });
+        	//define("ho", new int[] { 0x1b, '[', 'H' });
+        	define("im", new int[] { 0x1b, '[', '4', 'h' });
+            //define("kd", new int[] { '\n' });
+        	define("le", new int[] { CTRL('H') });
+        	define("md", new int[] { 0x1b, '[', '1', 'm' });
+        	define("me", new int[] { 0x1b, '[', 'm' });
+        	define("ml", new int[] { 0x1b, 'l' });
+        	define("mr", new int[] { 0x1b, '[', '7', 'm' });
+        	define("mu", new int[] { 0x1b, 'm' });
+        	define("nd", new int[] { 0x1b, '[', 'C' });
+        	define("nw", new int[] { '\r', '\n' });
+        	define("rc", new int[] { 0x1b, '8' });
+        	define("rs", new int[] { 0x1b, '[', 'm', 0x1b, '?', '7', 'h', 0x1b, '[', '4', 'l', 0x1b, '>', 0x1b, '7', 0x1b, '[', 'r', 0x1b, '[', '1', ';', '3', ';', '4', ';', '6', 'l', 0x1b, '8' });
+        	define("sc", new int[] { 0x1b, '7' });
+        	define("se", new int[] { 0x1b, '[', 'm' });
+        	//define("sf", new int[] { '\n' });
+        	define("so", new int[] { 0x1b, '[', '7', 'm' });
+        	define("sr", new int[] { 0x1b, 'M' });
+        	define("ta", new int[] { CTRL('I') });
+        	define("te", new int[] { 0x1b, '[', '2', 'J', 0x1b, '[', '?', '4', '7', 'l', 0x1b, 'B' });
+        	define("ti", new int[] { 0x1b, '7', 0x1b, '[', '?', '4', '7', 'h' });
+        	define("ue", new int[] { 0x1b, '[', 'm' });
+        	define("up", new int[] { 0x1b, '[', 'A' });
+        	define("us", new int[] { 0x1b, '[', '4', 'm' });
+        }
+
+        private static int CTRL(int c) {
+        	return c - 64;
+        }
+
+        public void define(String action, int[] seq) {
+            dig(start, action, seq);
+        }
+
+        private void dig(Node source, String action, int[] seq) {
+            // LOG.debug("dig(" + source.getId() + ")");
+            if (seq.length == 0) {
+                source.setAction(action);
+                return;
+            }
+            int event = seq[0];
+            Optional<Edge> optEdge = edges.stream().filter(e -> {
+                return e.getSource() == source && e.getEvent() == event;
+            }).findFirst();
+            if (optEdge.isPresent()) {
+                dig(optEdge.get().getTarget(), action,
+                    Arrays.copyOfRange(seq, 1, seq.length));
+            } else {
+                Node target = new Node(nodes.size());
+                nodes.add(target);
+                Edge edge = new Edge(source, target);
+                edge.setEvent(event);
+                edges.add(edge);
+                dig(target, action, Arrays.copyOfRange(seq, 1, seq.length));
+
+                if (event == NUM_PARAM) {
+                    edge = new Edge(target, target);
+                    edge.setEvent(event);
+                    edges.add(edge);
+                }
+            }
+        }
+
+        public List<List<Node>> findPath(Node source, Set<Edge> visited) {
+            // LOG.debug("findPath(" + source.getId() + ")");
+            List<List<Node>> result = new ArrayList<>();
+            List<Edge> sources = edges.stream().filter(e -> {
+                return e.getSource() == source;
+            }).collect(Collectors.toList());
+            if (sources.size() == 0) {
+                List<Node> nodeList = new ArrayList<>();
+                nodeList.add(source);
+                result.add(nodeList);
+                return result;
+            }
+            for (Edge edge : sources) {
+                if (visited.contains(edge)) {
+                    continue;
+                } else if (edge.getSource() == edge.getTarget()) {
+                    continue;
+                } else {
+                    visited.add(edge);
+                }
+                List<List<Node>> pathList = findPath(edge.getTarget(), visited);
+                for (List<Node> list : pathList) {
+                    list.add(0, source);
+                }
+                result.addAll(pathList);
+            }
+            return result;
+        }
+
+        List<Integer> buffer = new ArrayList<>();
+        public void write(int c) {
+            buffer.add(c);
+            Optional<Edge> optEdge = edges.stream()
+                .filter(e -> {
+                    return e.getSource() == curr && match(e.getEvent(), c);
+                })
+                .findFirst();
+            if (optEdge.isPresent()) {
+            	if (optEdge.get().getEvent() == NUM_PARAM) {
+                    numbuffer.add(c);
+            	} else if (numbuffer.size() > 0) {
+                    int r = 0;
+                    for (int i : numbuffer) {
+                        r = r * 10 + (i - '0');
+                    }
+                    params.add(r);
+                    numbuffer.clear();
+            	}
+            	curr = optEdge.get().getTarget();
+                if (curr.getAction() != null) {
+                	int p1, p2;
+                	switch (curr.getAction()) {
+                	case "AL":
+                		p1 = params.get(0);
+                		params.remove(0);
+                		terminal.cmd_AL(p1);
+                		break;
+                	case "DC":
+                		p1 = params.get(0);
+                		params.remove(0);
+                		terminal.cmd_DC(p1);
+                		break;
+                	case "DL":
+                		p1 = params.get(0);
+                		params.remove(0);
+                		terminal.cmd_DL(p1);
+                		break;
+                	case "DO":
+                		p1 = params.get(0);
+                		params.remove(0);
+                		terminal.cmd_DO(p1);
+                		break;
+                	case "LE":
+                		p1 = params.get(0);
+                		params.remove(0);
+                		terminal.cmd_LE(p1);
+                		break;
+                	case "RI":
+                		p1 = params.get(0);
+                		params.remove(0);
+                		terminal.cmd_RI(p1);
+                		break;
+                	case "UP":
+                		p1 = params.get(0);
+                		params.remove(0);
+                		terminal.cmd_UP(p1);
+                		break;
+                	case "ae":
+                		//terminal.cmd_ae();
+                		break;
+                	case "al":
+                		terminal.cmd_al();
+                		break;
+                	case "as":
+                		//terminal.cmd_as();
+                		break;
+                	case "bl":
+                		terminal.cmd_bl();
+                		break;
+                	case "cd":
+                		terminal.cmd_cd();
+                		break;
+                	case "ce":
+                		//terminal.cmd_ee();
+                		break;
+                	case "cl":
+                		terminal.cmd_cl();
+                		break;
+                	case "cm":
+                		p1 = params.get(0);
+                		p2 = params.get(1);
+                		params.remove(0);
+                		params.remove(0);
+                		terminal.cmd_cm(p1, p2);
+                		break;
+                	case "cr":
+                		terminal.cmd_cr();
+                		break;
+                	case "cs":
+                		p1 = params.get(0);
+                		p2 = params.get(1);
+                		params.remove(0);
+                		params.remove(0);
+                		terminal.cmd_cs(p1, p2);
+                		break;
+                	case "ct":
+                		terminal.cmd_ct();
+                		break;
+                	case "dc":
+                		terminal.cmd_dc();
+                		break;
+                	case "dl":
+                		terminal.cmd_dl();
+                		break;
+                	case "do":
+                		terminal.cmd_do();
+                		break;
+                	case "eA":
+                		//terminal.cmd_eA();
+                		break;
+                	case "ei":
+                		terminal.cmd_ei();
+                		break;
+                	case "im":
+                		terminal.cmd_im();
+                		break;
+                    case "kd":
+                    	terminal.cmd_kd();
+                		break;
+                	case "le":
+                		terminal.cmd_le();
+                		break;
+                	case "md":
+                		terminal.cmd_md();
+                		break;
+                	case "me":
+                		terminal.cmd_me();
+                		break;
+                	case "ml":
+                		//terminal.cmd_ml();
+                		break;
+                	case "mr":
+                		terminal.cmd_mr();
+                		break;
+                	case "mu":
+                		//terminal.cmd_mu();
+                		break;
+                	case "nd":
+                		terminal.cmd_nd();
+                		break;
+                	case "nw":
+                		terminal.cmd_nw();
+                		break;
+                	case "rc":
+                		terminal.cmd_rc();
+                		break;
+                	case "rs":
+                		terminal.cmd_rs();
+                		break;
+                	case "sc":
+                		terminal.cmd_sc();
+                		break;
+                	case "se":
+                		terminal.cmd_se();
+                		break;
+                	case "sf":
+                		terminal.cmd_sf();
+                		break;
+                	case "so":
+                		terminal.cmd_so();
+                		break;
+                	case "sr":
+                		terminal.cmd_sr();
+                		break;
+                	case "ta":
+                		terminal.cmd_ta();
+                		break;
+                	case "te":
+                		terminal.cmd_te();
+                		break;
+                	case "ti":
+                		terminal.cmd_ti();
+                		break;
+                	case "ue":
+                		terminal.cmd_ue();
+                		break;
+                	case "up":
+                		terminal.cmd_up();
+                		break;
+                	case "us":
+                		terminal.cmd_us();
+                		break;
+                	default:
+                		LOG.debug("cmd_" + curr.getAction() + "()");
+                		
+                	}
+                    curr = start;
+                    buffer.clear();
+                }
+            } else {
+                // バッファ + c を吐き出す
+                for (int b : buffer) {
+                	LOG.debug("put(" + (char)b + ")");
+                    terminal.put((char)b);
+                }
+                curr = start;
+                buffer.clear();
+            }
+        }
+
+        private List<Integer> numbuffer = new ArrayList<>();
+        private List<Integer> params = new ArrayList<>();
+        private boolean match(int expect, int actual) {
+            if (expect == NUM_PARAM && '0' <= actual && actual <= '9') {
+                return true;
+            } else {
+                return expect == actual;
+            }
+        }
+
+        public String toString() {
+            Set<Edge> visited = new HashSet<>();
+            StringBuffer sb = new StringBuffer();
+            for (List<Node> path : findPath(start, visited)) {
+                // LOG.debug("path=" + path);
+                String sep = "";
+                Node last = null;
+                for (Node node : path) {
+                    sb.append(sep + node.getId());
+                    sep = " -> ";
+                    last = node;
+                }
+                sb.append(" : " + last.getAction());
+                sb.append("\n");
+            }
+            return sb.toString();
+        }
+    }
+
+    public static class Node {
+        private int id;
+        private String action;
+
+        public Node(int id) {
+            this.id = id;
+        }
+
+        public int getId() {
+            return id;
+        }
+
+        public void setAction(String action) {
+            this.action = action;
+        }
+
+        public String getAction() {
+            return action;
+        }
+
+        public String toString() {
+            return String.valueOf(id);
+        }
+    }
+
+    public static class Edge {
+        private Node source;
+        private Node target;
+        private int event;
+
+        public Edge(Node source, Node target) {
+            this.source = source;
+            this.target = target;
+        }
+
+        public Node getSource() {
+            return source;
+        }
+
+        public Node getTarget() {
+            return target;
+        }
+
+        public void setEvent(int event) {
+            this.event = event;
+        }
+
+        public int getEvent() {
+            return event;
+        }
+
+        public String toString() {
+            return "[" + source + ", " + target + "]";
+        }
     }
 }
