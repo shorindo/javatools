@@ -17,15 +17,11 @@ import java.awt.event.KeyListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.font.TextHitInfo;
-import java.awt.im.InputContext;
 import java.awt.im.InputMethodRequests;
-import java.io.ByteArrayOutputStream;
-import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.PushbackReader;
 import java.io.Reader;
 import java.io.UnsupportedEncodingException;
 import java.text.AttributedCharacterIterator;
@@ -39,17 +35,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.Stack;
 import java.util.stream.Collectors;
-
-import com.shorindo.tools.Termcap.Edge;
-import com.shorindo.tools.Termcap.Node;
-import com.shorindo.tools.Termcap.StateMachine;
 
 public class Terminal {
     private static final Logger LOG = Logger.getLogger(Terminal.class);
     private String charset;
-    private InputStreamReader screenReader;
+    private TermcapReader termcapReader;
     private OutputStream keyboardOutput;
     private char[][] buffer;
     private int rows;
@@ -73,7 +64,7 @@ public class Terminal {
             public void run() {
                 int c;
                 try {
-                    while ((c = screenReader.read()) != -1) {
+                    while ((c = termcapReader.read()) != -1) {
                         //LOG.debug("run(" + (char)c + ")");
                         machine.write(c);
                     }
@@ -81,6 +72,7 @@ public class Terminal {
                     LOG.error(e.getMessage(), e);
                 } finally {
                     LOG.info("run() finished");
+                    System.exit(0);
                 }
             }
         };
@@ -100,7 +92,7 @@ public class Terminal {
      */
     public void setIn(InputStream is) {
         try {
-            screenReader = new InputStreamReader(is, charset);
+            termcapReader = new TermcapReader(new InputStreamReader(is, charset));
         } catch (UnsupportedEncodingException e) {
             LOG.error(e.getMessage(), e);
         }
@@ -785,10 +777,10 @@ public class Terminal {
         }
 
         public void define(String action, int[] seq) {
-            dig(start, action, seq);
+            define(start, action, seq);
         }
 
-        private void dig(Node source, String action, int[] seq) {
+        private void define(Node source, String action, int[] seq) {
             // LOG.debug("dig(" + source.getId() + ")");
             if (seq.length == 0) {
                 source.setAction(action);
@@ -799,7 +791,7 @@ public class Terminal {
                 return e.getSource() == source && e.getEvent() == event;
             }).findFirst();
             if (optEdge.isPresent()) {
-                dig(optEdge.get().getTarget(), action,
+                define(optEdge.get().getTarget(), action,
                     Arrays.copyOfRange(seq, 1, seq.length));
             } else {
                 Node target = new Node(nodes.size());
@@ -808,7 +800,7 @@ public class Terminal {
                 edge.setEvent(event);
                 edges.add(edge);
                 source.addEdge(edge);
-                dig(target, action, Arrays.copyOfRange(seq, 1, seq.length));
+                define(target, action, Arrays.copyOfRange(seq, 1, seq.length));
 
                 if (event == NUM_PARAM) {
                     edge = new Edge(target, target);
@@ -1161,35 +1153,64 @@ public class Terminal {
         }
     }
     
-    public static class BacktrackReader extends Reader {
-        private PushbackReader reader;
+    public static class TermcapReader extends Reader {
+        private Reader reader;
+        private List<Character> buffer;
+        private int position = 0;
 
-        public BacktrackReader(Reader in) {
-            this.reader = new PushbackReader(in, 1024);
+        public TermcapReader(Reader in) {
+        	reader = in;
+            buffer = new ArrayList<>();
         }
 
         @Override
         public int read() throws IOException {
-            return -1;
-        }
-
-        public int mark() {
-            return 0;
-        }
-
-        public void reset() {
+        	if (position < buffer.size() - 1) {
+        		return buffer.get(position++);
+        	} else {
+        		int c = reader.read();
+        		if (c != -1) {
+        			buffer.add((char)c);
+        			position++;
+        		}
+    			return c;
+        	}
         }
 
         @Override
         public int read(char[] cbuf, int off, int len) throws IOException {
-            // TODO Auto-generated method stub
-            return 0;
+        	int c;
+        	int count = 0;
+        	while ((c = read()) != -1 && count < len) {
+        		cbuf[off++] = (char)c;
+        		count++;
+        	}
+            return count;
         }
 
         @Override
         public void close() throws IOException {
-            // TODO Auto-generated method stub
+        	reader.close();
         }
         
+        public void reset() {
+        	buffer.clear();
+        	position = 0;
+        }
+
+        public int position() {
+        	return position;
+        }
+
+        public void rewind(int position) {
+        	if (position < 0) {
+        		this.position = 0;
+        	} else if (position >= buffer.size()) {
+        		this.position = buffer.size() - 1;
+        	} else {
+        		this.position = position;
+        	}
+        }
+
     }
 }
