@@ -684,7 +684,12 @@ public class Terminal {
     }
 
     public class TerminalEvent {
-        
+        private TerminalEventType type;
+        private List<String> params;
+    }
+    
+    public enum TerminalEventType {
+        KBD, SCR
     }
 
     public interface TerminalEventListener {
@@ -1159,58 +1164,68 @@ public class Terminal {
         private int position = 0;
 
         public TermcapReader(Reader in) {
-        	reader = in;
+            reader = in;
             buffer = new ArrayList<>();
         }
 
         @Override
         public int read() throws IOException {
-        	if (position < buffer.size() - 1) {
-        		return buffer.get(position++);
-        	} else {
-        		int c = reader.read();
-        		if (c != -1) {
-        			buffer.add((char)c);
-        			position++;
-        		}
-    			return c;
-        	}
+            if (position < buffer.size() - 1) {
+                return buffer.get(position++);
+            } else {
+                int c = reader.read();
+                if (c != -1) {
+                    buffer.add((char)c);
+                    position++;
+                }
+                return c;
+            }
         }
 
         @Override
         public int read(char[] cbuf, int off, int len) throws IOException {
-        	int c;
-        	int count = 0;
-        	while ((c = read()) != -1 && count < len) {
-        		cbuf[off++] = (char)c;
-        		count++;
-        	}
+            int c;
+            int count = 0;
+            while ((c = read()) != -1 && count < len) {
+                cbuf[off++] = (char)c;
+                count++;
+            }
             return count;
         }
 
         @Override
         public void close() throws IOException {
-        	reader.close();
+            reader.close();
         }
         
         public void reset() {
-        	buffer.clear();
-        	position = 0;
+            buffer.clear();
+            position = 0;
         }
 
         public int position() {
-        	return position;
+            return position;
         }
 
         public void rewind(int position) {
-        	if (position < 0) {
-        		this.position = 0;
-        	} else if (position >= buffer.size()) {
-        		this.position = buffer.size() - 1;
-        	} else {
-        		this.position = position;
-        	}
+            if (position < 0) {
+                this.position = 0;
+            } else if (position >= buffer.size()) {
+                this.position = buffer.size() - 1;
+            } else {
+                this.position = position;
+            }
         }
 
+    }
+    
+    /**
+     * 
+     */
+    private static class ScreenEvent {
+        
+    }
+    private enum ScreenEventType {
+        SCR_cl
     }
 }

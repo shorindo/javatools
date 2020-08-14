@@ -45,6 +45,7 @@ public class TerminalSSH {
             session.auth().verify(timeout);
             ChannelShell shell = session.createShellChannel();
             shell.setPtyType("xterm");
+            shell.setPtyLines(25);
             PipedInputStream tin = new PipedInputStream();
             PipedOutputStream tout = new PipedOutputStream(tin);
             terminal.setOut(tout);
