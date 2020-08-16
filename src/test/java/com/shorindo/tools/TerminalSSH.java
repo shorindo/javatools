@@ -15,29 +15,75 @@
  */
 package com.shorindo.tools;
 
+import java.io.ByteArrayInputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
-import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.sshd.client.SshClient;
 import org.apache.sshd.client.channel.ChannelShell;
 import org.apache.sshd.client.session.ClientSession;
-import org.apache.sshd.common.channel.PtyChannelConfigurationHolder;
-import org.apache.sshd.common.channel.PtyMode;
 
 /**
  * 
  */
 public class TerminalSSH {
+	private static final Logger LOG = Logger.getLogger(TerminalSSH.class);
 
     public static void main(String[] args) {
         Terminal terminal = new Terminal("UTF-8", 80, 25);
-        try{
+        terminal.open();
+        String user = prompt(terminal, "login: ", true);
+        String pass = prompt(terminal, "password:", false);
+        ssh(terminal, user, pass);
+    }
+    
+    private static String prompt(Terminal terminal, String text, boolean echo) {
+    	LOG.debug("prompt(" + text + ")");
+    	try {
+    		PipedInputStream sin = new PipedInputStream();
+    		PipedOutputStream sout = new PipedOutputStream(sin);
+    		sout.write(text.getBytes());
+    		PipedInputStream kin = new PipedInputStream();
+    		PipedOutputStream kout = new PipedOutputStream(kin);
+    		terminal.connect(sin, kout);
+    		int c;
+    		StringBuffer sb = new StringBuffer();
+    		while ((c = kin.read()) != '\n') {
+    			if (echo) sout.write((byte)c);
+    			else sout.write('*');
+    			sout.flush();
+    			sb.append((char)c);
+    		}
+    		sout.write('\r');
+    		sout.write('\n');
+    		sout.flush();
+    		Thread.sleep(100);
+    		sin.close();
+    		sout.close();
+    		kin.close();
+    		kout.close();
+    		return sb.toString();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+    	return null;
+    }
+    
+    private static void ssh(Terminal terminal, String server, String pass) {
+    	try{
             SshClient client = SshClient.setUpDefaultClient();
-            String host = args[0];
-            String user = args[1];
-            String passwd = args[2];
-            int port = Integer.parseInt(args[3]);
+            Pattern p = Pattern.compile("(.+?)@(.+)(:(\\d+))");
+            Matcher m = p.matcher(server);
+            if (!m.matches()) {
+            	LOG.error("invalid server:" + server);
+            	return;
+            }
+            String host = m.group(2);
+            String user = m.group(1);
+            String passwd = pass;
+            int port = m.groupCount() > 2 ? Integer.parseInt(m.group(4)) : 22;
             Long timeout = 10000L;
             client.start();
             ClientSession session = client.connect(user, host, port).verify(timeout).getSession();
@@ -47,17 +93,15 @@ public class TerminalSSH {
             shell.setPtyType("xterm");
             PipedInputStream tin = new PipedInputStream();
             PipedOutputStream tout = new PipedOutputStream(tin);
-            terminal.setOut(tout);
             shell.setIn(tin);
             PipedInputStream sin = new PipedInputStream();
             PipedOutputStream sout = new PipedOutputStream(sin);
-            terminal.setIn(sin);
+            terminal.connect(sin, tout);
             shell.setOut(sout);
             shell.setErr(sout);
             shell.open();
         } catch(Exception e){
             e.printStackTrace();
         }
-        terminal.start();
     }
 }

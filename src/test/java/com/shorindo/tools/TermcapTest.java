@@ -4,14 +4,14 @@ import static org.junit.Assert.*;
 
 import org.junit.Test;
 
-import com.shorindo.tools.Terminal.StateMachine;
+import com.shorindo.tools.Terminal.Termcap;
 
 public class TermcapTest {
     private static final Logger LOG = Logger.getLogger(TermcapTest.class);
 
     @Test
     public void test() {
-        StateMachine machine = new StateMachine();
+        Termcap machine = new Termcap();
         machine.write('A');
         machine.write('\n');
         machine.write(0x1b);
