@@ -85,44 +85,6 @@ public class Terminal {
         };
         thread.start();
     }
-    
-//    public void disconnect() {
-//    	LOG.debug("disconnect()");
-//    	if (termcapReader != null)
-//    		try {
-//    			termcapReader.close();
-//    		} catch (IOException e) {
-//    			LOG.error("close failed.", e);
-//    		}
-//    	if (keyboardOutput != null)
-//    		try {
-//    			keyboardOutput.close();
-//    		} catch (IOException e) {
-//    			LOG.error("close failed.", e);
-//    		}
-//    }
-
-//    public void start() {
-//        Thread th = new Thread() {
-//            @Override
-//            public void run() {
-//                int c;
-//                try {
-//                    while ((c = termcapReader.read()) != -1) {
-//                        //LOG.debug("run(" + (char)c + ")");
-//                        machine.write(c);
-//                    }
-//                } catch (IOException e) {
-//                    LOG.error(e.getMessage(), e);
-//                } finally {
-//                    LOG.info("run() finished");
-//                    System.exit(0);
-//                }
-//            }
-//        };
-//        th.start();
-//        //window();
-//    }
 
     /**
      * キーボードからのデータの出力先
@@ -437,28 +399,28 @@ public class Terminal {
         LOG.debug("cmd_so()");
     }
 
-    /** sr   逆スクロール */
+    /** 逆スクロール */
     protected void cmd_sr() {
         LOG.debug("cmd_sr()");
     }
 
-    /** ta   次のハードウェアタブ位置へ移動 */
+    /** 次のハードウェアタブ位置へ移動 */
     protected void cmd_ta() {
         LOG.debug("cmd_ta()");
         cc = ((int)(cc / 8) + 1) * 8;
     }
 
-    /** te   カーソル移動を用いるプログラムの終了 */
+    /** カーソル移動を用いるプログラムの終了 */
     protected void cmd_te() {
         LOG.debug("cmd_te()");
     }
 
-    /** ti   カーソル移動を用いるプログラムの開始 */
+    /** カーソル移動を用いるプログラムの開始 */
     protected void cmd_ti() {
         LOG.debug("cmd_ti()");
     }
 
-    /** ue   下線モード終了 */
+    /** 下線モード終了 */
     protected void cmd_ue() {
         LOG.debug("cmd_ue()");
     }
