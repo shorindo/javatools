@@ -29,7 +29,6 @@ import java.text.AttributedCharacterIterator.Attribute;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
@@ -281,27 +280,27 @@ public class Terminal {
         LOG.debug("cmd_kb");
     }
 
-    /** kd   下カーソルキー */
+    /** 下カーソルキー */
     protected void cmd_kd() {
     }
 
-    /** ke   キーパッドをオフにする */
+    /** キーパッドをオフにする */
     protected void cmd_ke() {
     }
 
-    /** kh   home キー */
+    /** home キー */
     protected void cmd_kh() {
     }
 
-    /** kl   左カーソルキー */
+    /** 左カーソルキー */
     protected void cmd_kl() {
     }
 
-    /** kr   右カーソルキー */
+    /** 右カーソルキー */
     protected void cmd_kr() {
     }
 
-    /** ku   上カーソルキー */
+    /** 上カーソルキー */
     protected void cmd_ku() {
     }
 
@@ -321,23 +320,23 @@ public class Terminal {
         }
     }
 
-    /** md   bold モード開始 */
+    /** bold モード開始 */
     protected void cmd_md() {
         LOG.debug("cmd_md()");
     }
 
-    /** me   so, us, mb, md, mr などのモード全てを終了する */
+    /** so, us, mb, md, mr などのモード全てを終了する */
     protected void cmd_me() {
         LOG.debug("cmd_me()");
     }
 
 
-    /** mr   反転モード開始 */
+    /** 反転モード開始 */
     protected void cmd_mr() {
         LOG.debug("cmd_mr()");
     }
 
-    /** nd   カーソルを右に一文字分移動 */
+    /** カーソルを右に一文字分移動 */
     protected void cmd_nd() {
         LOG.debug("cmd_nd()");
     }
@@ -384,17 +383,17 @@ public class Terminal {
         savedCursor = new Cursor(cr, cc);
     }
 
-    /** se   強調モード終了 */
+    /** 強調モード終了 */
     protected void cmd_se() {
         LOG.debug("cmd_se()");
     }
 
-    /** sf   順方向の 1 行スクロール */
+    /** 順方向の 1 行スクロール */
     protected void cmd_sf() {
         LOG.debug("cmd_sf()");
     }
 
-    /** so   強調モード開始 */
+    /** 強調モード開始 */
     protected void cmd_so() {
         LOG.debug("cmd_so()");
     }
@@ -440,7 +439,7 @@ public class Terminal {
         }
     }
 
-    /** us   下線モード開始 */
+    /** 下線モード開始 */
     protected void cmd_us() {
         LOG.debug("cmd_us()");
     }
@@ -724,16 +723,13 @@ public class Terminal {
         private List<Node> nodes;
         private List<Edge> edges;
         private Node start;
-        private Node curr;
         private Terminal terminal;
-        private List<List<Edge>> pathList;
 
         public Termcap(Terminal terminal) {
             this.terminal = terminal;
             nodes = new ArrayList<>();
             edges = new ArrayList<>();
             start = new Node(0);
-            curr = start;
             nodes.add(start);
             
             define("AL", new int[] { 0x1b, '[', NUM_PARAM, 'L' });
@@ -786,21 +782,8 @@ public class Terminal {
             define("up", new int[] { 0x1b, '[', 'A' });
             define("us", new int[] { 0x1b, '[', '4', 'm' });
 
-            Set<Edge> visited = new HashSet<>();
-            pathList = findPath(start, visited);
             LOG.debug(this.toString());
         }
-        
-//        public void start(InputStream is) {
-//            while (true) {
-//                try {
-//                    String cap = start.consume(is);
-//                    LOG.debug("cap=" + cap);
-//                } catch (IOException e) {
-//                    break;
-//                }
-//            }
-//        }
 
         private static int CTRL(int c) {
             return c - 64;
@@ -868,59 +851,6 @@ public class Terminal {
             }
             return result;
         }
-        
-//        private int walk(List<Integer> buffer) {
-//        	List<Character> numchars = new ArrayList<>();
-//        	List<Integer> params = new ArrayList<>();
-//        	List<List<Edge>> matchList = pathList.stream()
-//        		.filter(path -> {
-//        			int i = 0;
-//        			for (int c : buffer) {
-//        				int e = path.get(i).getEvent();
-//            			if ('0' <= c && c <= '9' && e == 0x2FFFF) {
-//            				numchars.add((char)c);
-//            				continue;
-//            			} else if (c == e) {
-//            				if (numchars.size() > 0) {
-//                                int r = 0;
-//                                for (int n : numbuffer) {
-//                                    r = r * 10 + (n - '0');
-//                                }
-//                                params.add(r);
-//                                numchars.clear();
-//            				}
-//            			} else {
-//            				return false;
-//            			}
-//        				i++;
-//        			}
-//        			return i == path.size();
-//        		})
-//        		.collect(Collectors.toList());
-//        	if (matchList.size() == 1) {
-//        		List<Edge> path = matchList.get(0);
-//        		int i = 0;
-//        		for (int c : buffer) {
-//        			int e = path.get(i).getEvent();
-//        			if ('0' <= c && c <= '9' && e == 0x2FFFF) {
-//        				numchars.add((char)c);
-//        			} else {
-//        				if (numchars.size() > 0) {
-//                            int r = 0;
-//                            for (int n : numbuffer) {
-//                                r = r * 10 + (n - '0');
-//                            }
-//                            params.add(r);
-//                            numchars.clear();
-//        				}
-//        				i++;
-//        			}
-//        		}
-//        		String action = path.get(path.size() - 1).getTarget().getAction();
-//        		LOG.debug("walk() => " + action + params);
-//        	}
-//        	return matchList.size();
-//        }
 
         List<Integer> buffer = new CopyOnWriteArrayList<>();
         public void write(int c) {
@@ -945,38 +875,6 @@ public class Terminal {
 			} catch (IOException e1) {
 				e1.printStackTrace();
 			}
-//            Optional<Edge> optEdge = edges.stream()
-//                .filter(e -> {
-//                    return e.getSource() == curr && match(e.getEvent(), c);
-//                })
-//                .findFirst();
-//            if (optEdge.isPresent()) {
-//                if (optEdge.get().getEvent() == NUM_PARAM) {
-//                    numbuffer.add(c);
-//                } else if (numbuffer.size() > 0) {
-//                    int r = 0;
-//                    for (int i : numbuffer) {
-//                        r = r * 10 + (i - '0');
-//                    }
-//                    params.add(r);
-//                    numbuffer.clear();
-//                }
-//                curr = optEdge.get().getTarget();
-//                if (curr.getAction() != null) {
-//                    doAction(curr.getAction());
-//                    curr = start;
-//                    buffer.clear();
-//                    params.clear();
-//                }
-//            } else {
-//                // バッファ + c を吐き出す
-//                for (int b : buffer) {
-//                    //LOG.debug("put(" + (char)b + ")");
-//                    terminal.fireEvent(new KeyboardEvent(KeyboardEventType.TYPE, b));
-//                }
-//                curr = start;
-//                buffer.clear();
-//            }
         }
         
         private void doAction(String action) {
@@ -1128,14 +1026,6 @@ public class Terminal {
             }
         }
 
-        private boolean match(int expect, int actual) {
-            if (expect == NUM_PARAM && '0' <= actual && actual <= '9') {
-                return true;
-            } else {
-                return expect == actual;
-            }
-        }
-
         public String toString() {
             Set<Edge> visited = new HashSet<>();
             StringBuffer sb = new StringBuffer();
@@ -1214,7 +1104,6 @@ public class Terminal {
     		List<Integer> subList = buffer.subList(1, buffer.size());
             for (Edge edge : targets) {
             	if (edge.getEvent() == 0x2FFFF) {
-            		// TODO 戻ったときはどうする？
             		numbuffer.add(c);
             	} else if (numbuffer.size() > 0) {
             		int r = 0;
@@ -1253,6 +1142,7 @@ public class Terminal {
     }
 
     public static class UnmatchException extends Exception {
+		private static final long serialVersionUID = 1L;
     }
 
     public static class Edge {
