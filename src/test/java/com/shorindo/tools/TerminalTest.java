@@ -9,7 +9,7 @@ import java.io.OutputStream;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.shorindo.tools.Terminal.StateMachine;
+import com.shorindo.tools.Terminal.Termcap;
 
 public class TerminalTest {
     private static final Logger LOG = Logger.getLogger(TerminalTest.class);
@@ -34,7 +34,7 @@ public class TerminalTest {
     
     @Test
     public void test_state_machine() {
-        StateMachine machine = new StateMachine(null);
+        Termcap machine = new Termcap(null);
         ByteArrayInputStream bais = new ByteArrayInputStream(new byte[] {
             //0x1b, '[', '1', 'm',
             0x1b, '[', '3', 'A'
