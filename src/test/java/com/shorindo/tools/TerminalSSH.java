@@ -15,7 +15,6 @@
  */
 package com.shorindo.tools;
 
-import java.io.ByteArrayInputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.util.regex.Matcher;
@@ -40,39 +39,39 @@ public class TerminalSSH {
     }
     
     private static String prompt(Terminal terminal, String text, boolean echo) {
-    	LOG.debug("prompt(" + text + ")");
-    	try {
-    		PipedInputStream sin = new PipedInputStream();
-    		PipedOutputStream sout = new PipedOutputStream(sin);
-    		sout.write(text.getBytes());
-    		PipedInputStream kin = new PipedInputStream();
-    		PipedOutputStream kout = new PipedOutputStream(kin);
-    		terminal.connect(sin, kout);
-    		int c;
-    		StringBuffer sb = new StringBuffer();
-    		while ((c = kin.read()) != '\n') {
-    			if (echo) sout.write((byte)c);
-    			else sout.write('*');
-    			sout.flush();
-    			sb.append((char)c);
-    		}
-    		sout.write('\r');
-    		sout.write('\n');
-    		sout.flush();
-    		Thread.sleep(100);
-    		sin.close();
-    		sout.close();
-    		kin.close();
-    		kout.close();
-    		return sb.toString();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-    	return null;
+        LOG.debug("prompt(" + text + ")");
+        try {
+            PipedInputStream sin = new PipedInputStream();
+            PipedOutputStream sout = new PipedOutputStream(sin);
+            sout.write(text.getBytes());
+            PipedInputStream kin = new PipedInputStream();
+            PipedOutputStream kout = new PipedOutputStream(kin);
+            terminal.connect(sin, kout);
+            int c;
+            StringBuffer sb = new StringBuffer();
+            while ((c = kin.read()) != '\n') {
+                if (echo) sout.write((byte)c);
+                else sout.write('*');
+                sout.flush();
+                sb.append((char)c);
+            }
+            sout.write('\r');
+            sout.write('\n');
+            sout.flush();
+            Thread.sleep(100);
+            sin.close();
+            sout.close();
+            kin.close();
+            kout.close();
+            return sb.toString();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
     }
     
     private static void ssh(Terminal terminal, String server, String pass) {
-    	try{
+        try{
             SshClient client = SshClient.setUpDefaultClient();
             Pattern p = Pattern.compile("(.+?)@(.+)(:(\\d+))");
             Matcher m = p.matcher(server);

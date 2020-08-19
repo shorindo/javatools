@@ -1,6 +1,7 @@
 package com.shorindo.tools;
 
 import java.awt.Canvas;
+import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.FontMetrics;
@@ -41,17 +42,21 @@ public class Terminal {
     private String charset;
     private TermcapReader termcapReader;
     private OutputStream keyboardOutput;
-    private char[][] buffer;
+    private DecoratedCharacter[][] buffer;
     private int rows;
     private int cols;
     private int cr, cc;
+    private Settings settings = new Settings();
     private Termcap machine;
     private Thread thread;
 
     public Terminal(String charset, int cols, int rows) {
         this.rows = rows;
         this.cols = cols;
-        this.buffer = new char[rows][cols];
+        this.buffer = new DecoratedCharacter[rows][cols];
+        for (int i = 0; i < rows; i++) {
+            this.buffer[i] = DecoratedCharacter.newArray(cols);
+        }
         this.charset = charset;
         this.setIn(System.in);
         this.setOut(System.out);
@@ -59,23 +64,23 @@ public class Terminal {
     }
     
     public void connect(InputStream is, OutputStream os) {
-    	LOG.debug("connect()");
-    	if (thread != null) {
-    		thread.interrupt();
-    	}
-    	this.setIn(is);
-    	this.setOut(os);
-    	thread = new Thread() {
+        LOG.debug("connect()");
+        if (thread != null) {
+            thread.interrupt();
+        }
+        this.setIn(is);
+        this.setOut(os);
+        thread = new Thread() {
             @Override
             public void run() {
                 int c;
                 try {
                     while ((c = termcapReader.read()) != -1) {
-                    	//LOG.debug("run(" + (char)c + ")");
+                        //LOG.debug("run(" + (char)c + ")");
                         machine.write(c);
                     }
                 } catch (IOException e) {
-                	LOG.warn(e.getMessage());
+                    LOG.warn(e.getMessage());
                 } finally {
                     LOG.info("run() finished");
                     //System.exit(0);
@@ -103,7 +108,7 @@ public class Terminal {
         }
     }
 
-    protected char[][] getBuffer() {
+    protected DecoratedCharacter[][] getBuffer() {
         return buffer;
     }
 
@@ -113,6 +118,10 @@ public class Terminal {
 
     public int getCols() {
         return cols;
+    }
+    
+    public Settings getSettings() {
+        return settings;
     }
 
     /** FIXME 文字のカラムサイズを取得する */
@@ -125,15 +134,19 @@ public class Terminal {
         //LOG.debug("put(" + c + ")");
         int w = getWidth(c);
         if (cc + w <= cols) {
-            buffer[cr][cc] = c;
+            DecoratedCharacter dc = new DecoratedCharacter(c);
+            dc.setFontStyle(fontStyle);
+            buffer[cr][cc] = dc;
             cc += w;
         } else if (cr < rows - 1) {
             cr += 1;
-            buffer[cr][0] = c;
+            DecoratedCharacter dc = new DecoratedCharacter(c);
+            dc.setFontStyle(fontStyle);
+            buffer[cr][0] = dc;
             cc = w;
         } else {
             cmd_cs(1, cr);
-            buffer[rows - 1] = new char[cols];
+            buffer[rows - 1] = DecoratedCharacter.newArray(cols);
             cc = 0;
             put(c);
         }
@@ -164,14 +177,25 @@ public class Terminal {
     protected void cmd_ce() {
         LOG.debug("cmd_ce()");
         for (int c = cc; c < cols; c++) {
-        	buffer[cr][c] = 0;
+            buffer[cr][c] = new DecoratedCharacter((char)0);
         }
+    }
+    
+    /** 水平絶対位置 %1 */
+    private void cmd_ch(int col) {
+        LOG.debug("cmd_ch(" + col + ")");
+        if (col < 1) col = 1;
+        else if (col > cols) col = cols;
+        this.cc = col - 1;
     }
 
     /** 画面を消去し、カーソルをホームポジションへ */
     protected void cmd_cl() {
         LOG.debug("cmd_cl()");
-        buffer = new char[rows][cols];
+        buffer = new DecoratedCharacter[rows][cols];
+        for (int i = 0; i < rows; i++) {
+            buffer[i] = DecoratedCharacter.newArray(cols);
+        }
         cr = 0;
         cc = 0;
     }
@@ -210,11 +234,18 @@ public class Terminal {
         LOG.debug("cmd_ct()");
     }
 
+    /** 垂直絶対位置 %1 */
+    private void cmd_cv(int row) {
+        LOG.debug("cmd_cv(" + row + ")");
+        if (row < 0) row = 1;
+        else if (row > rows) row = rows;
+        this.cr = row - 1;
+    }
 
     /** 一文字削除する */
     protected void cmd_dc() {
         LOG.debug("cmd_dc()");
-        buffer[cr][cc] = 0;
+        buffer[cr][cc] = new DecoratedCharacter((char)0);
         if (cc > 0) {
             cc -= 1;
         }
@@ -248,7 +279,7 @@ public class Terminal {
             cr += 1;
         } else {
             cmd_cs(1, rows);
-            buffer[rows - 1] = new char[cols];
+            buffer[rows - 1] = DecoratedCharacter.newArray(cols);
         }
     }
 
@@ -269,7 +300,7 @@ public class Terminal {
     protected void cmd_ho() {
         LOG.debug("cmd_ho");
     }
-
+    
     /** insert モード開始 */
     protected void cmd_im() {
         LOG.debug("cmd_im()");
@@ -323,11 +354,14 @@ public class Terminal {
     /** bold モード開始 */
     protected void cmd_md() {
         LOG.debug("cmd_md()");
+        //fontStyle = Font.BOLD;
+        fontStyle = Font.ITALIC;
     }
 
     /** so, us, mb, md, mr などのモード全てを終了する */
     protected void cmd_me() {
         LOG.debug("cmd_me()");
+        fontStyle = Font.PLAIN;
     }
 
 
@@ -447,6 +481,7 @@ public class Terminal {
     private TCanvas canvas;
     //private OutputStream os = new ByteArrayOutputStream();
     private static Dimension bbox = new Dimension();
+    private static int fontStyle = Font.PLAIN;
     
     public void open() {
         final TFrame frame = new TFrame();
@@ -472,7 +507,7 @@ public class Terminal {
 
             @Override
             public void keyPressed(KeyEvent e) {
-            	//LOG.debug("keyPressed(" + e + ")");
+                //LOG.debug("keyPressed(" + e + ")");
                 if (e.isControlDown() && e.getKeyCode() != 17) {
                     byte[] b = new byte[] { (byte)(e.getKeyCode() - 0x40) };
                     try {
@@ -517,7 +552,7 @@ public class Terminal {
         });
         frame.setVisible(true);
 
-        canvas.setFont(new Font("ＭＳ ゴシック", Font.PLAIN, 24));
+        canvas.setFont(getSettings().getFont(fontStyle));
         FontMetrics fm = canvas.getGraphics().getFontMetrics();
         int width = fm.charWidth('あ') / 2;
         int height = fm.getAscent() + fm.getDescent();
@@ -525,6 +560,8 @@ public class Terminal {
         canvas.setSize(
             (int)bbox.getWidth() * this.getCols(),
             (int)bbox.getHeight() * this.getRows());
+        canvas.setBackground(settings.getBackColor());
+        canvas.setForeground(settings.getForeColor());
         frame.pack();
     }
 
@@ -558,7 +595,7 @@ public class Terminal {
             if (imageBuffer == null) {
                 back = createImage(size.width, size.height);
                 imageBuffer = back.getGraphics();
-                imageBuffer.setFont(new Font("ＭＳ ゴシック", Font.PLAIN, 24));
+                imageBuffer.setFont(terminal.getSettings().getFont(fontStyle));
                 FontMetrics fm = imageBuffer.getFontMetrics();
                 width = fm.charWidth('あ') / 2;
                 height = fm.getAscent() + fm.getDescent();
@@ -566,14 +603,17 @@ public class Terminal {
             }
             try {
                 imageBuffer.clearRect(0, 0, (int)size.getWidth(), (int)size.getHeight());
-                char[][] textBuffer = terminal.getBuffer();
+                DecoratedCharacter[][] textBuffer = terminal.getBuffer();
                 for (int i = 0; i < textBuffer.length; i++) {
-                    char[] line = textBuffer[i];
+                    DecoratedCharacter[] line = textBuffer[i];
                     for (int j = 0; j < line.length; j++) {
-                        char ch = line[j];
-                        if (ch > 0) {
+                        DecoratedCharacter ch = line[j];
+                        if (ch == null) {
+                            LOG.error("buff[" + i + "][" + j + "] is null.");
+                        }
+                        if (ch.getValue() > 0) {
                             //LOG.info("ch=" + ch);
-                            show(String.valueOf(ch), i, j);
+                            show(ch, i, j);
                         }
                     }
                 }
@@ -586,17 +626,16 @@ public class Terminal {
             }
         }
 
-        public void show(String s, int row, int col) {
+        public void show(DecoratedCharacter ch, int row, int col) {
             //LOG.debug("show(" + s + ", " + row + ", " + col + ")");
             int offset = width * col;
-            for (int i = 0; i < s.length(); i++) {
-                char ch = s.charAt(i);
-                imageBuffer.drawString(String.valueOf(ch), offset, height * (row + 1));
-                if (ch < 0xff) 
-                    offset += width;
-                else
-                    offset += width * 2;
-            }
+            imageBuffer.setFont(terminal.getSettings().getFont(ch.getFontStyle()));
+            imageBuffer.drawString(String.valueOf(ch.getValue()), offset, height * (row + 1));
+            // FIXME
+            if (ch.getValue() < 0xff) 
+                offset += width;
+            else
+                offset += width * 2;
         }
 
         @Override
@@ -670,7 +709,7 @@ public class Terminal {
 
         @Override
         public void onEvent(KeyboardEvent event) {
-        	terminal.put((char)event.getValue());
+            terminal.put((char)event.getValue());
             repaint();
         }
         
@@ -713,6 +752,32 @@ public class Terminal {
             return "[" + row + ", " + col + "]";
         }
     }
+    
+    private static class Settings {
+        //private Color foreColor = Color.WHITE;
+        private Color foreColor = Color.BLUE;
+        private Color backColor = Color.WHITE;
+        private Font plainFont = new Font("ＭＳ ゴシック", Font.PLAIN, 24);
+        private Font boldFont = new Font("ＭＳ ゴシック", Font.BOLD, 24);
+        private Font italicFont = new Font("ＭＳ ゴシック", Font.ITALIC, 24);
+
+        public Color getForeColor() {
+            return foreColor;
+        }
+        public Color getBackColor() {
+            return backColor;
+        }
+        public Font getFont(int strong) {
+            switch (strong) {
+            case Font.BOLD:
+                return boldFont;
+            case Font.ITALIC:
+                return italicFont;
+            default:
+                return plainFont;
+            }
+        }
+    }
 
     private static List<Integer> numbuffer = new ArrayList<>();
     private static LinkedList<Integer> params = new LinkedList<>();
@@ -732,6 +797,8 @@ public class Terminal {
             start = new Node(0);
             nodes.add(start);
             
+            define("AB", new int[] { 0x1b, '4', '8', ';', '5', ';', NUM_PARAM, 'm' });
+            define("AF", new int[] { 0x1b, '3', '8', ';', '5', ';', NUM_PARAM, 'm' });
             define("AL", new int[] { 0x1b, '[', NUM_PARAM, 'L' });
             define("DC", new int[] { 0x1b, '[', NUM_PARAM, 'P' });
             define("DL", new int[] { 0x1b, '[', NUM_PARAM, 'M' });
@@ -745,11 +812,13 @@ public class Terminal {
             define("bl", new int[] { CTRL('G') });
             define("cd", new int[] { 0x1b, '[', 'J' });
             define("ce", new int[] { 0x1b, '[', 'K' });
+            define("ch", new int[] { 0x1b, '[', NUM_PARAM, 'G' });
             define("cl", new int[] { 0x1b, '[', 'H', 0x1b, '[', '2', 'J' });
             define("cm", new int[] { 0x1b, '[', NUM_PARAM, ';', NUM_PARAM, 'H' });
             define("cr", new int[] { '\r' });
             define("cs", new int[] { 0x1b, '[', NUM_PARAM, ';', NUM_PARAM, 'r' });
             define("ct", new int[] { 0x1b, '[', '3', 'g' });
+            define("cv", new int[] { 0x1b, '[', NUM_PARAM, 'd' });
             define("dc", new int[] { 0x1b, '[', 'P' });
             define("dl", new int[] { 0x1b, '[', 'M' });
             define("do", new int[] { '\n' });
@@ -781,6 +850,8 @@ public class Terminal {
             define("ue", new int[] { 0x1b, '[', 'm' });
             define("up", new int[] { 0x1b, '[', 'A' });
             define("us", new int[] { 0x1b, '[', '4', 'm' });
+            define("us", new int[] { 0x1b, '[', '2', '4', 'm' });
+            define("xx", new int[] { 0x1b, '[', '0', 'm' });
 
             LOG.debug(this.toString());
         }
@@ -796,7 +867,7 @@ public class Terminal {
         private void define(Node source, String action, int[] seq) {
             // LOG.debug("dig(" + source.getId() + ")");
             if (seq.length == 0) {
-                source.setAction(action);
+                source.addAction(action);
                 return;
             }
             int event = seq[0];
@@ -856,29 +927,33 @@ public class Terminal {
         public void write(int c) {
             buffer.add(c);
             try {
-            	String action = start.consume(buffer);
-            	if (action != null) {
-            		doAction(action);
-            		numbuffer.clear();
-            		params.clear();
-            		buffer.clear();
-            	}
-			} catch (UnmatchException e1) {
-				//LOG.debug("unmatch:" + (char)c);
-				for (int b : buffer) {
+                Set<String> actions = start.consume(buffer);
+                if (actions.size() > 0) {
+                    for (String action : actions) {
+                        doAction(action);
+                    }
+                    // FIXME 次があったらクリアしたくない
+                    numbuffer.clear();
+                    params.clear();
+                    buffer.clear();
+                }
+            } catch (UnmatchException e1) {
+                //LOG.debug("unmatch:" + (char)c);
+                for (int b : buffer) {
                     //LOG.debug("put(" + (char)b + ")");
                     terminal.fireEvent(new KeyboardEvent(KeyboardEventType.TYPE, b));
                 }
-        		numbuffer.clear();
-        		params.clear();
+                numbuffer.clear();
+                params.clear();
                 buffer.clear();
-			} catch (IOException e1) {
-				e1.printStackTrace();
-			}
+            } catch (IOException e1) {
+                e1.printStackTrace();
+            }
         }
         
         private void doAction(String action) {
-        	switch (action) {
+            int p1, p2;
+            switch (action) {
             case "AL":
                 terminal.cmd_AL(params.removeLast());
                 break;
@@ -918,24 +993,30 @@ public class Terminal {
             case "ce":
                 terminal.cmd_ce();
                 break;
+            case "ch":
+                terminal.cmd_ch(params.removeLast());
+                break;
             case "cl":
                 terminal.cmd_cl();
                 break;
             case "cm":
-            	int p2 = params.removeLast();
-            	int p1 = params.removeLast();
+                p2 = params.removeLast();
+                p1 = params.removeLast();
                 terminal.cmd_cm(p1, p2);
                 break;
             case "cr":
                 terminal.cmd_cr();
                 break;
             case "cs":
-            	p2 = params.removeLast();
-            	p1 = params.removeLast();
+                p2 = params.removeLast();
+                p1 = params.removeLast();
                 terminal.cmd_cs(p1, p2);
                 break;
             case "ct":
                 terminal.cmd_ct();
+                break;
+            case "cv":
+                terminal.cmd_cv(params.removeLast());
                 break;
             case "dc":
                 terminal.cmd_dc();
@@ -1048,7 +1129,7 @@ public class Terminal {
                     sb.append(sep + next.getId());
                     prev = next;
                 }
-                sb.append(" : " + next.getAction());
+                sb.append(" : " + next.getActions());
                 sb.append("\n");
             }
             return sb.toString();
@@ -1072,54 +1153,55 @@ public class Terminal {
 
     public static class Node {
         private int id;
-        private String action;
+        private Set<String> actions;
         private List<Edge> edges;
 
         public Node(int id) {
             this.id = id;
+            this.actions = new HashSet<>();
             this.edges = new ArrayList<>();
         }
 
         public void addEdge(Edge edge) {
-        	edges.add(edge);
+            edges.add(edge);
         }
 
-        public String consume(List<Integer> buffer) throws UnmatchException, IOException {
+        public Set<String> consume(List<Integer> buffer) throws UnmatchException, IOException {
             if (buffer.size() == 0) {
-                return action;
+                return actions;
             }
             int c = buffer.get(0);
             //LOG.debug("consume(" + (char)c + ") <= " + this);
             List<Edge> targets = edges.stream()
-            	.filter(e -> {
-            		if (c == e.getEvent()) {
-            			return true;
-            		} else if ('0' <= c && c <= '9' && e.getEvent() == 0x2FFFF) {
-            			return true;
-            		} else {
-            			return false;
-            		}
-            	})
-            	.collect(Collectors.toList());
-    		List<Integer> subList = buffer.subList(1, buffer.size());
+                .filter(e -> {
+                    if (c == e.getEvent()) {
+                        return true;
+                    } else if ('0' <= c && c <= '9' && e.getEvent() == 0x2FFFF) {
+                        return true;
+                    } else {
+                        return false;
+                    }
+                })
+                .collect(Collectors.toList());
+            List<Integer> subList = buffer.subList(1, buffer.size());
             for (Edge edge : targets) {
-            	if (edge.getEvent() == 0x2FFFF) {
-            		numbuffer.add(c);
-            	} else if (numbuffer.size() > 0) {
-            		int r = 0;
-            		for (int n : numbuffer) {
-            			r = r * 10 + (n - '0');
-            		}
-            		params.add(r);
-            		numbuffer.clear();
-            	}
-            	try {
-                	Node next = edge.getTarget();
-            		return next.consume(subList);
-            	} catch(UnmatchException e) {
-            		numbuffer.clear();
-            		params.clear();
-            	}
+                if (edge.getEvent() == 0x2FFFF) {
+                    numbuffer.add(c);
+                } else if (numbuffer.size() > 0) {
+                    int r = 0;
+                    for (int n : numbuffer) {
+                        r = r * 10 + (n - '0');
+                    }
+                    params.add(r);
+                    numbuffer.clear();
+                }
+                try {
+                    Node next = edge.getTarget();
+                    return next.consume(subList);
+                } catch(UnmatchException e) {
+                    numbuffer.clear();
+                    params.clear();
+                }
             }
             throw new UnmatchException();
         }
@@ -1128,12 +1210,12 @@ public class Terminal {
             return id;
         }
 
-        public void setAction(String action) {
-            this.action = action;
+        public void addAction(String action) {
+            this.actions.add(action);
         }
 
-        public String getAction() {
-            return action;
+        public Set<String> getActions() {
+            return actions;
         }
 
         public String toString() {
@@ -1298,6 +1380,36 @@ public class Terminal {
 
         public String getCap() {
             return cap;
+        }
+    }
+    
+    public static class DecoratedCharacter {
+        private char value;
+        private int fontStyle = Font.PLAIN;
+        private boolean reverse = false;
+        private boolean underline = false;
+        private Color foreColor;
+        private Color backColor;
+        
+        public static DecoratedCharacter[] newArray(int size) {
+            DecoratedCharacter[] array = new DecoratedCharacter[size];
+            for (int i = 0; i < size; i++) {
+                array[i] = new DecoratedCharacter((char)0);
+            }
+            return array;
+        }
+
+        public DecoratedCharacter(char ch) {
+            this.value = ch;
+        }
+        public char getValue() {
+            return value;
+        }
+        public void setFontStyle(int style) {
+            this.fontStyle = style;
+        }
+        public int getFontStyle() {
+            return fontStyle;
         }
     }
 }
