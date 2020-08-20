@@ -40,6 +40,7 @@ import java.util.stream.Collectors;
 public class Terminal {
     private static final Logger LOG = Logger.getLogger(Terminal.class);
     private String charset;
+    private Terminfo terminfo;
     private TermcapReader termcapReader;
     private OutputStream keyboardOutput;
     private DecoratedCharacter[][] buffer;
@@ -51,6 +52,7 @@ public class Terminal {
     private Thread thread;
 
     public Terminal(String charset, int cols, int rows) {
+        this.terminfo = Terminfo.compile("xterm");
         this.rows = rows;
         this.cols = cols;
         this.buffer = new DecoratedCharacter[rows][cols];
