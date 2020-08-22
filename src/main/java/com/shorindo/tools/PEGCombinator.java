@@ -497,7 +497,7 @@ public class PEGCombinator {
                     throw e;
                 }
                 $$.setSource(ctx.subString(curr, ctx.position()));
-                LOG.trace("rule$Sequence accept <- " + $$.getSource());
+                //LOG.trace("rule$Sequence accept <- " + $$.getSource());
                 return ctx.success(this, action.apply($$), curr, ctx.position());
             }
             
@@ -701,8 +701,8 @@ public class PEGCombinator {
         private PEGContext ctx;
         private RuleTypes type;
         private String source;
-        private String value;
-        private boolean empty = false;
+        private Object value;
+//        private boolean empty = false;
         private List<PEGNode> childList = new ArrayList<PEGNode>();
 
         public PEGNode(PEGContext ctx, RuleTypes type) {
@@ -715,10 +715,10 @@ public class PEGCombinator {
         public void setType(RuleTypes type) {
             this.type = type;
         }
-        public String getValue() {
+        public Object getValue() {
             return value;
         }
-        public void setValue(String value) {
+        public void setValue(Object value) {
             this.value = value;
         }
 //        public boolean isEmpty() {
@@ -780,8 +780,8 @@ public class PEGCombinator {
             case "PEG_SEQUENCE": sb.append("="); break;
             case "PEG_AND": sb.append("&"); break;
             case "PEG_NOT": sb.append("!"); break;
-            case "PEG_CLASS": sb.append("[" + escape(getValue()) + "]"); break;
-            case "PEG_REGEXP": sb.append("/" + escape(getValue()) + "/"); break;
+            case "PEG_CLASS": sb.append("[" + escape(getValue().toString()) + "]"); break;
+            case "PEG_REGEXP": sb.append("/" + escape(getValue().toString()) + "/"); break;
             case "PEG_LITERAL": sb.append("'" + getValue() + "'"); break;
             default:
                 sb.append(getType().name());

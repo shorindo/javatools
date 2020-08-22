@@ -16,16 +16,22 @@
 package com.shorindo.tools;
 
 import static com.shorindo.tools.Terminfo.InfoTypes.*;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import com.shorindo.tools.PEGCombinator.PEGContext;
+import com.shorindo.tools.PEGCombinator.PEGException;
+import com.shorindo.tools.PEGCombinator.PEGNode;
 import com.shorindo.tools.PEGCombinator.RuleTypes;
 
 /**
- * 
+ * terminfoソースを解析する
  */
 public class Terminfo {
+    private static final Logger LOG = Logger.getLogger(Terminfo.class);
+
     private static PEGCombinator PEG = new PEGCombinator();
     static {
         PEG.define(TERMINFO, PEG.rule$ZeroOrMore(
@@ -39,16 +45,123 @@ public class Terminfo {
             PEG.rule(EOL_OR_EOF)));
         PEG.define(ENTRY, PEG.rule$Sequence(
             PEG.rule(ENTRY_START),
-            PEG.rule(ENTRY_NEXT)));
+            PEG.rule$ZeroOrMore(
+                PEG.rule(ENTRY_NEXT))));
         PEG.define(EMPTY, PEG.rule(EOL));
+        PEG.define(ENTRY_START,
+            PEG.rule(VARIABLES),
+            PEG.rule$ZeroOrMore(
+                PEG.rule(DELIM),
+                PEG.rule(CAPABILITY)),
+            PEG.rule$Optional(PEG.rule(DELIM)));    
+        PEG.define(VARIABLES,
+            PEG.rule(NAME),
+            PEG.rule$ZeroOrMore(
+                PEG.rule$Literal("|"),
+                PEG.rule(ALIAS)));
+        PEG.define(NAME, PEG.rule$RegExp("[a-zA-Z0-9\\-]+"));
+        PEG.define(ALIAS, PEG.rule$RegExp("[^,]+"));
+        PEG.define(DELIM, PEG.rule$RegExp("\\s*,\\s*"));
+        PEG.define(CAPABILITY, PEG.rule$Choice(
+            PEG.rule(NUM_CAP),
+            PEG.rule(STR_CAP),
+            PEG.rule(BOOL_CAP)));
+        PEG.define(CAP_NAME, PEG.rule$RegExp("[a-zA-Z0-9]+"));
+        PEG.define(BOOL_CAP, PEG.rule(CAP_NAME));
+        PEG.define(NUM_CAP, PEG.rule(CAP_NAME),
+            PEG.rule$Literal("#"),
+            PEG.rule(NUMBER));
+        PEG.define(STR_CAP, PEG.rule(CAP_NAME),
+            PEG.rule$Literal("="),
+            PEG.rule(CAP_VALUE));
+        PEG.define(CAP_VALUE, PEG.rule$OneOrMore(
+            PEG.rule$Choice(
+                PEG.rule(ESCAPED),
+                PEG.rule(CTRL),
+                PEG.rule(PARAM),
+                PEG.rule$RegExp("[^,]")))
+            .action($$ -> {
+                for (int i = 0; i < $$.length(); i++) {
+                    PEGNode $i = $$.get(i).get(0);
+                    System.out.println("$i -> " + $i.getValue());
+                }
+                return $$;
+            }));
+        PEG.define(ENTRY_NEXT,
+            PEG.rule$RegExp("[ \t]+"),
+            PEG.rule$ZeroOrMore(
+                PEG.rule(DELIM),
+                PEG.rule(CAPABILITY)));
+
+        // \200/\e/\E/\n/\l/\r/\t/\b/\f/\s/\^/\\/\,/\:/\0
+        PEG.define(ESCAPED, PEG.rule$RegExp("\\\\([0-7]{3,3}|[eEnlrtbfs^\\,:0])"))
+            .action($$ -> {
+                switch ($$.get(0).getValue().toString()) {
+                case "\\e":
+                case "\\E": $$.setValue("\u001b"); break;
+                case "\\n":
+                case "\\l": $$.setValue("\n"); break;
+                case "\\r": $$.setValue("\r"); break;
+                case "\\t": $$.setValue("\t"); break;
+                case "\\b": $$.setValue("\b"); break;
+                case "\\f": $$.setValue("\f"); break;
+                case "\\s": $$.setValue(" "); break;
+                case "\\^": $$.setValue("^"); break;
+                case "\\\\": $$.setValue("\\"); break;
+                case "\\,": $$.setValue(","); break;
+                case "\\:": $$.setValue(":"); break;
+                case "\\0": $$.setValue("\200"); break;
+                default: $$.setValue(
+                    String.valueOf((char)Integer.parseInt($$.getValue().toString().substring(1), 8)));
+                    break;
+                }
+                return $$;
+            });
+
+        // ^x
+        PEG.define(CTRL, PEG.rule$RegExp("\\^[a-zA-Z]"))
+            .action($$ -> {
+                char c = $$.get(0).getValue().toString().charAt(1);
+                $$.setValue(String.valueOf((char)(c - 64)));
+                return $$;
+            });
+
+        // %%/%c/%s/%p[1-9]/%P[a-z]/%g[a-z]/%P[A-Z]/%g[A-Z/%'c'/%{nn}/%l/%+/%-/%*/%//%m/%&/%|%^/%=/%>/%</%A/%O/%!/%~/%i...
+        PEG.define(PARAM, PEG.rule$RegExp("%([%cdis]|p[1-9])"))
+            .action($$ -> {
+                $$.setValue($$.get(0).getValue());
+                return $$;
+            });
+        PEG.define(NUMBER, PEG.rule$Choice(
+            PEG.rule$RegExp("[1-9][0-9]*"), // 10進数
+            PEG.rule$RegExp("0[0-7]+"), // 8進数
+            PEG.rule$RegExp("0[xX][0-9a-fA-F]+") // 16進数
+            ));
+        PEG.define(EOL, PEG.rule$RegExp("\r?\n"));
+        PEG.define(EOF, PEG.rule$Not(
+            PEG.rule$Any()));
+        PEG.define(EOL_OR_EOF, PEG.rule$Choice(
+            PEG.rule(EOL),
+            PEG.rule(EOF)));
     }
 
     public static enum InfoTypes implements RuleTypes {
         TERMINFO, LINE, COMMENT, ENTRY, EMPTY, ENTRY_START, ENTRY_NEXT,
-        VARIABLES, EOL_OR_EOF, EOL, EOF;
+        VARIABLES, NAME, ALIAS, CAPABILITY, CAP_NAME, BOOL_CAP, NUM_CAP, STR_CAP,
+        CAP_VALUE, NUMBER, ESCAPED, CTRL, PARAM,
+        DELIM, EOL_OR_EOF, EOL, EOF;
     }
 
-    public static Terminfo compile(String source) {
+    public static Terminfo compile(String source) throws TerminfoException {
+        PEGContext ctx = PEG.createContext(source);
+        try {
+            PEG.rule(TERMINFO).accept(ctx);
+        } catch (PEGException e) {
+            LOG.error("failed", e);
+        }
+        if (ctx.available() > 0) {
+            throw new TerminfoException(ctx.subString(ctx.position()));
+        }
         return new Terminfo("xterm");
     }
 
@@ -916,6 +1029,12 @@ public class Terminfo {
 
         private CapTypes(String capCode, String capName) {
             
+        }
+    }
+    
+    public static class TerminfoException extends Exception {
+        public TerminfoException(String message) {
+            super(message);
         }
     }
 }

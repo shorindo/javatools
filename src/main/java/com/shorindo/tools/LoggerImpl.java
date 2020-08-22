@@ -32,9 +32,9 @@ public class LoggerImpl extends Logger {
     }
 
     private void log(Level level, String message, Object... params) {
-    	String now = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new Date());
-    	if (message == null) message = "";
-    	MessageFormat format = new MessageFormat(message);
+        String now = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new Date());
+        if (message == null) message = "";
+        MessageFormat format = new MessageFormat(message);
         System.out.println(now + " [" + level + "] " + className + " - " + format.format(params));
     }
 
