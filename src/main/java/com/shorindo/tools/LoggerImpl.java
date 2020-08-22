@@ -32,15 +32,24 @@ public class LoggerImpl extends Logger {
     }
 
     private void log(Level level, String message, Object... params) {
+        if (getLevel().getPriority() > level.getPriority()) {
+            return;
+        }
         String now = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new Date());
-        if (message == null) message = "";
-        MessageFormat format = new MessageFormat(message);
-        System.out.println(now + " [" + level + "] " + className + " - " + format.format(params));
+        if (message == null) {
+            message = "";
+        }
+        if (params.length > 0) {
+            MessageFormat format = new MessageFormat(message);
+            System.out.println(now + " [" + level + "] " + className + " - " + format.format(params));
+        } else {
+            System.out.println(now + " [" + level + "] " + className + " - " + message);
+        }
     }
 
     private void log(Level level, String message, Throwable th, Object... params) {
-    	log(level, message, params);
-    	th.printStackTrace(System.out);
+        log(level, message, params);
+        th.printStackTrace(System.out);
     }
 
     @Override

@@ -35,45 +35,108 @@ public class Terminfo {
     private static PEGCombinator PEG = new PEGCombinator();
     static {
         PEG.define(TERMINFO, PEG.rule$ZeroOrMore(
-            PEG.rule(LINE)));
+            PEG.rule(LINE)))
+            .action($$ -> {
+                for (int i = 0; i < $$.get(0).length(); i++) {
+                    PEGNode $i = $$.get(0).get(i).get(0).get(0);
+                    if ($i.getType() == ENTRY) {
+                        return $i;
+                    }
+                }
+                return $$;
+            });
+
         PEG.define(LINE, PEG.rule$Choice(
             PEG.rule(COMMENT),
             PEG.rule(ENTRY),
             PEG.rule(EMPTY)));
+
         PEG.define(COMMENT, PEG.rule$Sequence(
             PEG.rule$RegExp("#[^\n]*"),
             PEG.rule(EOL_OR_EOF)));
-        PEG.define(ENTRY, PEG.rule$Sequence(
-            PEG.rule(ENTRY_START),
-            PEG.rule$ZeroOrMore(
-                PEG.rule(ENTRY_NEXT))));
+
         PEG.define(EMPTY, PEG.rule(EOL));
-        PEG.define(ENTRY_START,
+
+        PEG.define(ENTRY,
             PEG.rule(VARIABLES),
             PEG.rule$ZeroOrMore(
                 PEG.rule(DELIM),
-                PEG.rule(CAPABILITY)),
-            PEG.rule$Optional(PEG.rule(DELIM)));    
+                PEG.rule(CAPABILITY))
+                .action($$ -> {
+                    List<Object> childList = new ArrayList<>();
+                    for (int i = 0; i < $$.length(); i++) {
+                        PEGNode $i = $$.get(i).get(1);
+                        childList.add($i.getValue());
+                    }
+                    $$.setValue(childList);
+                    return $$;
+                }),
+            PEG.rule$Optional(PEG.rule(DELIM)))
+            .action($$ -> {
+                String name = $$.get(0).get(0).get(0).getValue().toString();
+                Terminfo info = new Terminfo(name);
+                for (Capability cap : (List<Capability>)$$.get(1).getValue()) {
+                    info.addCapability(cap);
+                }
+                $$.setValue(info);
+                return $$;
+            });
+
         PEG.define(VARIABLES,
             PEG.rule(NAME),
             PEG.rule$ZeroOrMore(
                 PEG.rule$Literal("|"),
                 PEG.rule(ALIAS)));
+
         PEG.define(NAME, PEG.rule$RegExp("[a-zA-Z0-9\\-]+"));
+
         PEG.define(ALIAS, PEG.rule$RegExp("[^,]+"));
+
         PEG.define(DELIM, PEG.rule$RegExp("\\s*,\\s*"));
+
         PEG.define(CAPABILITY, PEG.rule$Choice(
             PEG.rule(NUM_CAP),
             PEG.rule(STR_CAP),
-            PEG.rule(BOOL_CAP)));
-        PEG.define(CAP_NAME, PEG.rule$RegExp("[a-zA-Z0-9]+"));
-        PEG.define(BOOL_CAP, PEG.rule(CAP_NAME));
+            PEG.rule(BOOL_CAP)))
+            .action($$ -> {
+                $$.setValue($$.get(0).getValue());
+                return $$;
+            });
+
+        PEG.define(CAP_NAME, PEG.rule$RegExp("[a-zA-Z0-9]+"))
+            .action($$ -> {
+                $$.setValue($$.get(0).getValue());
+                return $$;
+            });
+        
+        // ブール値
+        PEG.define(BOOL_CAP, PEG.rule(CAP_NAME))
+            .action($$ -> {
+                String capName = $$.get(0).getValue().toString();
+                $$.setValue(new Capability(CapTypes.of(capName), true));
+                return $$;
+            });
+        
         PEG.define(NUM_CAP, PEG.rule(CAP_NAME),
             PEG.rule$Literal("#"),
-            PEG.rule(NUMBER));
+            PEG.rule(NUMBER))
+            .action($$ -> {
+                String capName = $$.get(0).getValue().toString();
+                int capValue = Integer.parseInt($$.get(2).getValue().toString());
+                $$.setValue(new Capability(CapTypes.of(capName), capValue));
+                return $$;
+            });
+
         PEG.define(STR_CAP, PEG.rule(CAP_NAME),
             PEG.rule$Literal("="),
-            PEG.rule(CAP_VALUE));
+            PEG.rule(CAP_VALUE))
+            .action($$ -> {
+                String capName = $$.get(0).getValue().toString();
+                Object capValue = $$.get(2).get(0).getValue();
+                $$.setValue(new Capability(CapTypes.of(capName), capValue));
+                return $$;
+            });
+
         PEG.define(CAP_VALUE, PEG.rule$OneOrMore(
             PEG.rule$Choice(
                 PEG.rule(ESCAPED),
@@ -81,17 +144,14 @@ public class Terminfo {
                 PEG.rule(PARAM),
                 PEG.rule$RegExp("[^,]")))
             .action($$ -> {
+                List<Object> data = new ArrayList<>();
                 for (int i = 0; i < $$.length(); i++) {
                     PEGNode $i = $$.get(i).get(0);
-                    System.out.println("$i -> " + $i.getValue());
+                    data.add($i.getValue());
                 }
+                $$.setValue(data);
                 return $$;
             }));
-        PEG.define(ENTRY_NEXT,
-            PEG.rule$RegExp("[ \t]+"),
-            PEG.rule$ZeroOrMore(
-                PEG.rule(DELIM),
-                PEG.rule(CAPABILITY)));
 
         // \200/\e/\E/\n/\l/\r/\t/\b/\f/\s/\^/\\/\,/\:/\0
         PEG.define(ESCAPED, PEG.rule$RegExp("\\\\([0-7]{3,3}|[eEnlrtbfs^\\,:0])"))
@@ -126,17 +186,37 @@ public class Terminfo {
                 return $$;
             });
 
-        // %%/%c/%s/%p[1-9]/%P[a-z]/%g[a-z]/%P[A-Z]/%g[A-Z/%'c'/%{nn}/%l/%+/%-/%*/%//%m/%&/%|%^/%=/%>/%</%A/%O/%!/%~/%i...
+        // FIXME %%/%c/%s/%p[1-9]/%P[a-z]/%g[a-z]/%P[A-Z]/%g[A-Z/%'c'/%{nn}/%l/%+/%-/%*/%//%m/%&/%|%^/%=/%>/%</%A/%O/%!/%~/%i...
         PEG.define(PARAM, PEG.rule$RegExp("%([%cdis]|p[1-9])"))
             .action($$ -> {
                 $$.setValue($$.get(0).getValue());
                 return $$;
             });
+
+        // 123/0177/0x1b
         PEG.define(NUMBER, PEG.rule$Choice(
-            PEG.rule$RegExp("[1-9][0-9]*"), // 10進数
-            PEG.rule$RegExp("0[0-7]+"), // 8進数
-            PEG.rule$RegExp("0[xX][0-9a-fA-F]+") // 16進数
-            ));
+            // 10進数
+            PEG.rule$RegExp("[1-9][0-9]*")
+                .action($$ -> {
+                    $$.setValue(Integer.parseInt($$.getValue().toString()));
+                    return $$;
+                }),
+            // 8進数
+            PEG.rule$RegExp("0[0-7]+")
+                .action($$ -> {
+                    $$.setValue(Integer.parseInt($$.getValue().toString(), 8));
+                    return $$;
+                }),
+            // 16進数
+            PEG.rule$RegExp("0[xX][0-9a-fA-F]+")
+                .action($$ -> {
+                    $$.setValue(Integer.parseInt($$.getValue().toString(), 16));
+                    return $$;
+                })))
+            .action($$ -> {
+                return $$.get(0);
+            });
+
         PEG.define(EOL, PEG.rule$RegExp("\r?\n"));
         PEG.define(EOF, PEG.rule$Not(
             PEG.rule$Any()));
@@ -146,7 +226,7 @@ public class Terminfo {
     }
 
     public static enum InfoTypes implements RuleTypes {
-        TERMINFO, LINE, COMMENT, ENTRY, EMPTY, ENTRY_START, ENTRY_NEXT,
+        TERMINFO, LINE, COMMENT, ENTRY, EMPTY,
         VARIABLES, NAME, ALIAS, CAPABILITY, CAP_NAME, BOOL_CAP, NUM_CAP, STR_CAP,
         CAP_VALUE, NUMBER, ESCAPED, CTRL, PARAM,
         DELIM, EOL_OR_EOF, EOL, EOF;
@@ -155,14 +235,14 @@ public class Terminfo {
     public static Terminfo compile(String source) throws TerminfoException {
         PEGContext ctx = PEG.createContext(source);
         try {
-            PEG.rule(TERMINFO).accept(ctx);
+            return (Terminfo)PEG.rule(TERMINFO).accept(ctx).getValue();
         } catch (PEGException e) {
             LOG.error("failed", e);
         }
         if (ctx.available() > 0) {
             throw new TerminfoException(ctx.subString(ctx.position()));
         }
-        return new Terminfo("xterm");
+        return null;
     }
 
     private String name;
@@ -1027,12 +1107,31 @@ public class Terminfo {
         CAP_zerom("Zx", "zerom")
         ;
 
+        private String capCode;
+        private String capName;
+
         private CapTypes(String capCode, String capName) {
-            
+            this.capCode = capCode;
+            this.capName = capName;
+        }
+        
+        public String getCapCode() {
+            return capCode;
+        }
+
+        public static CapTypes of(String capName) {
+            for (CapTypes type : values()) {
+                if (type.capName.equals(capName)) {
+                    return type;
+                }
+            }
+            return null;
         }
     }
     
     public static class TerminfoException extends Exception {
+        private static final long serialVersionUID = 1L;
+
         public TerminfoException(String message) {
             super(message);
         }

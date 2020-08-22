@@ -19,6 +19,8 @@ import static org.junit.Assert.*;
 
 import org.junit.Test;
 
+import com.shorindo.tools.Terminfo.Capability;
+
 /**
  * 
  */
@@ -85,6 +87,11 @@ public class TerminfoTest {
             "  smkx=\\E[?1h\\E=, smso=\\E[7m, smul=\\E[4m, tbc=\\E[3g,\n" +
             "  u6=\\E[%i%d;%dR, u7=\\E[6n, u8=\\E[?1;2c, u9=\\E[c,\n";
         Terminfo terminfo = Terminfo.compile(info);
+        assertEquals("xterm", terminfo.getName());
+        assertTrue(terminfo.getCapabilities().size() > 0);
+        for (Capability cap : terminfo.getCapabilities()) {
+            System.out.println(cap.getType() + "=" + cap.getData());
+        }
     }
 
 }

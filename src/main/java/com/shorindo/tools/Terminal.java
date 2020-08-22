@@ -37,6 +37,8 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
+import com.shorindo.tools.Terminfo.TerminfoException;
+
 public class Terminal {
     private static final Logger LOG = Logger.getLogger(Terminal.class);
     private String charset;
@@ -52,17 +54,21 @@ public class Terminal {
     private Thread thread;
 
     public Terminal(String charset, int cols, int rows) {
-        this.terminfo = Terminfo.compile("xterm");
-        this.rows = rows;
-        this.cols = cols;
-        this.buffer = new DecoratedCharacter[rows][cols];
-        for (int i = 0; i < rows; i++) {
-            this.buffer[i] = DecoratedCharacter.newArray(cols);
+        try {
+            this.terminfo = Terminfo.compile("xterm");
+            this.rows = rows;
+            this.cols = cols;
+            this.buffer = new DecoratedCharacter[rows][cols];
+            for (int i = 0; i < rows; i++) {
+                this.buffer[i] = DecoratedCharacter.newArray(cols);
+            }
+            this.charset = charset;
+            this.setIn(System.in);
+            this.setOut(System.out);
+            this.machine = new Termcap(this);
+        } catch (TerminfoException e) {
+            LOG.error("initialize error", e);
         }
-        this.charset = charset;
-        this.setIn(System.in);
-        this.setOut(System.out);
-        this.machine = new Termcap(this);
     }
     
     public void connect(InputStream is, OutputStream os) {
@@ -510,8 +516,9 @@ public class Terminal {
             @Override
             public void keyPressed(KeyEvent e) {
                 //LOG.debug("keyPressed(" + e + ")");
-                if (e.isControlDown() && e.getKeyCode() != 17) {
-                    byte[] b = new byte[] { (byte)(e.getKeyCode() - 0x40) };
+                int keycode = e.getKeyCode();
+                if (e.isControlDown() && keycode != KeyEvent.VK_CONTROL) {
+                    byte[] b = new byte[] { (byte)(keycode & 63) };
                     try {
                         keyboardOutput.write(b);
                         keyboardOutput.flush();
@@ -859,7 +866,7 @@ public class Terminal {
         }
 
         private static int CTRL(int c) {
-            return c - 64;
+            return Character.toUpperCase(c) & 63;
         }
 
         public void define(String action, int[] seq) {

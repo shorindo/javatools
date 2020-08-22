@@ -23,6 +23,7 @@ import java.util.Map;
  */
 public abstract class Logger {
     private static Map<Class<?>, Logger> loggerMap = new HashMap<>();
+    private static Level level = Level.INFO;
 
     public static Logger getLogger(Class<?> clazz) {
         Logger logger = loggerMap.get(clazz);
@@ -33,6 +34,12 @@ public abstract class Logger {
         return logger;
     }
     
+    public static void setLevel(Level level) {
+        Logger.level = level;
+    }
+    public static Level getLevel() {
+        return Logger.level;
+    }
     public abstract void error(String message);
     public abstract void error(String message, Object...params);
     public abstract void error(String message, Throwable th);
@@ -55,6 +62,15 @@ public abstract class Logger {
     public abstract void trace(String message, Throwable th, Object...params);
     
     public static enum Level {
-        ERROR, WARN, INFO, DEBUG, TRACE;
+        TRACE(0), DEBUG(1), INFO(2), WARN(3), ERROR(4);
+
+        private int priority;
+
+        private Level(int priority) {
+            this.priority = priority;
+        }
+        public int getPriority() {
+            return priority;
+        }
     }
 }
