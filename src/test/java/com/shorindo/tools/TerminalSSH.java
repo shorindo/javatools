@@ -24,6 +24,8 @@ import org.apache.sshd.client.SshClient;
 import org.apache.sshd.client.channel.ChannelShell;
 import org.apache.sshd.client.session.ClientSession;
 
+import com.shorindo.tools.Logger.Level;
+
 /**
  * 
  */
@@ -31,6 +33,7 @@ public class TerminalSSH {
 	private static final Logger LOG = Logger.getLogger(TerminalSSH.class);
 
     public static void main(String[] args) {
+        Logger.setLevel(Level.DEBUG);
         Terminal terminal = new Terminal("UTF-8", 80, 25);
         terminal.open();
         String user = prompt(terminal, "login: ", true);
@@ -76,8 +79,8 @@ public class TerminalSSH {
             Pattern p = Pattern.compile("(.+?)@(.+)(:(\\d+))");
             Matcher m = p.matcher(server);
             if (!m.matches()) {
-            	LOG.error("invalid server:" + server);
-            	return;
+                LOG.error("invalid server:" + server);
+                return;
             }
             String host = m.group(2);
             String user = m.group(1);
