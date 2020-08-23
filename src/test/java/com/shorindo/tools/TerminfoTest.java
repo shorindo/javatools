@@ -90,7 +90,9 @@ public class TerminfoTest {
         assertEquals("xterm", terminfo.getName());
         assertTrue(terminfo.getCapabilities().size() > 0);
         for (Capability cap : terminfo.getCapabilities()) {
-            System.out.println(cap.getType() + "=" + cap.getData());
+            if (cap.getType() != null) {
+                System.out.println(cap.getType().getCapCode() + "=" + cap.getData());
+            }
         }
     }
 

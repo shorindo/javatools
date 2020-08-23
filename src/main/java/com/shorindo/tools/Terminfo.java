@@ -31,6 +31,17 @@ import com.shorindo.tools.PEGCombinator.RuleTypes;
  */
 public class Terminfo {
     private static final Logger LOG = Logger.getLogger(Terminfo.class);
+    public static final int PARAM_I  = 0x1FFFF;
+    public static final int PARAM_P1 = 0x2FFFF;
+    public static final int PARAM_P2 = 0x3FFFF;
+    public static final int PARAM_P3 = 0x4FFFF;
+    public static final int PARAM_P4 = 0x5FFFF;
+    public static final int PARAM_P5 = 0x6FFFF;
+    public static final int PARAM_P6 = 0x7FFFF;
+    public static final int PARAM_P7 = 0x8FFFF;
+    public static final int PARAM_P8 = 0x9FFFF;
+    public static final int PARAM_P9 = 0xA2FFFF;
+    public static final int PARAM_D  = 0xBFFFF;
 
     private static PEGCombinator PEG = new PEGCombinator();
     static {
@@ -103,7 +114,7 @@ public class Terminfo {
                 return $$;
             });
 
-        PEG.define(CAP_NAME, PEG.rule$RegExp("[a-zA-Z0-9]+"))
+        PEG.define(CAP_NAME, PEG.rule$RegExp("\\.?[a-zA-Z0-9]+"))
             .action($$ -> {
                 $$.setValue($$.get(0).getValue());
                 return $$;
@@ -142,7 +153,12 @@ public class Terminfo {
                 PEG.rule(ESCAPED),
                 PEG.rule(CTRL),
                 PEG.rule(PARAM),
-                PEG.rule$RegExp("[^,]")))
+                PEG.rule$RegExp("[^,]")
+                    .action($$ -> {
+                        $$.setValue(
+                            new Integer(((String)$$.getValue()).charAt(0)));
+                        return $$;
+                    })))
             .action($$ -> {
                 List<Object> data = new ArrayList<>();
                 for (int i = 0; i < $$.length(); i++) {
@@ -158,21 +174,21 @@ public class Terminfo {
             .action($$ -> {
                 switch ($$.get(0).getValue().toString()) {
                 case "\\e":
-                case "\\E": $$.setValue("\u001b"); break;
+                case "\\E": $$.setValue(0x1b); break;
                 case "\\n":
-                case "\\l": $$.setValue("\n"); break;
-                case "\\r": $$.setValue("\r"); break;
-                case "\\t": $$.setValue("\t"); break;
-                case "\\b": $$.setValue("\b"); break;
-                case "\\f": $$.setValue("\f"); break;
-                case "\\s": $$.setValue(" "); break;
-                case "\\^": $$.setValue("^"); break;
-                case "\\\\": $$.setValue("\\"); break;
-                case "\\,": $$.setValue(","); break;
-                case "\\:": $$.setValue(":"); break;
-                case "\\0": $$.setValue("\200"); break;
+                case "\\l": $$.setValue((int)'\n'); break;
+                case "\\r": $$.setValue((int)'\r'); break;
+                case "\\t": $$.setValue((int)'\t'); break;
+                case "\\b": $$.setValue((int)'\b'); break;
+                case "\\f": $$.setValue((int)'\f'); break;
+                case "\\s": $$.setValue((int)' '); break;
+                case "\\^": $$.setValue((int)'^'); break;
+                case "\\\\": $$.setValue((int)'\\'); break;
+                case "\\,": $$.setValue((int)','); break;
+                case "\\:": $$.setValue((int)':'); break;
+                case "\\0": $$.setValue((int)'\200'); break;
                 default: $$.setValue(
-                    String.valueOf((char)Integer.parseInt($$.getValue().toString().substring(1), 8)));
+                    Integer.parseInt($$.getValue().toString().substring(1), 8));
                     break;
                 }
                 return $$;
@@ -182,14 +198,30 @@ public class Terminfo {
         PEG.define(CTRL, PEG.rule$RegExp("\\^[a-zA-Z]"))
             .action($$ -> {
                 char c = $$.get(0).getValue().toString().charAt(1);
-                $$.setValue(String.valueOf((char)(c - 64)));
+                $$.setValue(new Integer((char)(c - 64)));
                 return $$;
             });
 
         // FIXME %%/%c/%s/%p[1-9]/%P[a-z]/%g[a-z]/%P[A-Z]/%g[A-Z/%'c'/%{nn}/%l/%+/%-/%*/%//%m/%&/%|%^/%=/%>/%</%A/%O/%!/%~/%i...
         PEG.define(PARAM, PEG.rule$RegExp("%([%cdis]|p[1-9])"))
             .action($$ -> {
-                $$.setValue($$.get(0).getValue());
+                int p = 0;
+                switch ((String)$$.get(0).getValue()) {
+                case "%i":  p = PARAM_I; break;
+                case "%d":  p = PARAM_D; break;
+                case "%p1": p = PARAM_P1; break;
+                case "%p2": p = PARAM_P2; break;
+                case "%p3": p = PARAM_P3; break;
+                case "%p4": p = PARAM_P4; break;
+                case "%p5": p = PARAM_P5; break;
+                case "%p6": p = PARAM_P6; break;
+                case "%p7": p = PARAM_P7; break;
+                case "%p8": p = PARAM_P8; break;
+                case "%p9": p = PARAM_P9; break;
+                default:
+                    LOG.error("unknown parameter = " + $$.get(0).getValue());
+                }
+                $$.setValue(p);
                 return $$;
             });
 

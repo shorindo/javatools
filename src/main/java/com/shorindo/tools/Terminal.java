@@ -37,12 +37,13 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
+import com.shorindo.tools.Terminfo.Capability;
 import com.shorindo.tools.Terminfo.TerminfoException;
 
 public class Terminal {
     private static final Logger LOG = Logger.getLogger(Terminal.class);
     private String charset;
-    private Terminfo terminfo;
+    //private Terminfo terminfo;
     private TermcapReader termcapReader;
     private OutputStream keyboardOutput;
     private DecoratedCharacter[][] buffer;
@@ -54,8 +55,8 @@ public class Terminal {
     private Thread thread;
 
     public Terminal(String charset, int cols, int rows) {
-        try {
-            this.terminfo = Terminfo.compile("xterm");
+//        try {
+            //this.terminfo = Terminfo.compile("xterm");
             this.rows = rows;
             this.cols = cols;
             this.buffer = new DecoratedCharacter[rows][cols];
@@ -66,9 +67,9 @@ public class Terminal {
             this.setIn(System.in);
             this.setOut(System.out);
             this.machine = new Termcap(this);
-        } catch (TerminfoException e) {
-            LOG.error("initialize error", e);
-        }
+//        } catch (TerminfoException e) {
+//            LOG.error("initialize error", e);
+//        }
     }
     
     public void connect(InputStream is, OutputStream os) {
@@ -793,7 +794,7 @@ public class Terminal {
 
     public static class Termcap {
         //private static int INCR_PARAM = 0x1FFFF;
-        private static int NUM_PARAM = 0x2FFFF;
+        //private static int NUM_PARAM = 0x2FFFF;
         private List<Node> nodes;
         private List<Edge> edges;
         private Node start;
@@ -806,61 +807,125 @@ public class Terminal {
             start = new Node(0);
             nodes.add(start);
             
-            define("AB", new int[] { 0x1b, '4', '8', ';', '5', ';', NUM_PARAM, 'm' });
-            define("AF", new int[] { 0x1b, '3', '8', ';', '5', ';', NUM_PARAM, 'm' });
-            define("AL", new int[] { 0x1b, '[', NUM_PARAM, 'L' });
-            define("DC", new int[] { 0x1b, '[', NUM_PARAM, 'P' });
-            define("DL", new int[] { 0x1b, '[', NUM_PARAM, 'M' });
-            define("DO", new int[] { 0x1b, '[', NUM_PARAM, 'B' });
-            define("LE", new int[] { 0x1b, '[', NUM_PARAM, 'D' });
-            define("RI", new int[] { 0x1b, '[', NUM_PARAM, 'C' });
-            define("UP", new int[] { 0x1b, '[', NUM_PARAM, 'A' });
-            define("ae", new int[] { CTRL('O') });
-            define("al", new int[] { 0x1b, '[', 'L' });
-            define("as", new int[] { CTRL('N') });
-            define("bl", new int[] { CTRL('G') });
-            define("cd", new int[] { 0x1b, '[', 'J' });
-            define("ce", new int[] { 0x1b, '[', 'K' });
-            define("ch", new int[] { 0x1b, '[', NUM_PARAM, 'G' });
-            define("cl", new int[] { 0x1b, '[', 'H', 0x1b, '[', '2', 'J' });
-            define("cm", new int[] { 0x1b, '[', NUM_PARAM, ';', NUM_PARAM, 'H' });
-            define("cr", new int[] { '\r' });
-            define("cs", new int[] { 0x1b, '[', NUM_PARAM, ';', NUM_PARAM, 'r' });
-            define("ct", new int[] { 0x1b, '[', '3', 'g' });
-            define("cv", new int[] { 0x1b, '[', NUM_PARAM, 'd' });
-            define("dc", new int[] { 0x1b, '[', 'P' });
-            define("dl", new int[] { 0x1b, '[', 'M' });
-            define("do", new int[] { '\n' });
-            define("eA", new int[] { 0x1b, '[', ')', '0' });
-            define("ei", new int[] { 0x1b, '[', '4', 'l' });
-            //define("ho", new int[] { 0x1b, '[', 'H' });
-            define("im", new int[] { 0x1b, '[', '4', 'h' });
-            //define("kd", new int[] { '\n' });
-            define("ke", new int[] { 0x1b, '[', '?', '1', 'l', 0x1b, '>' });
-            define("ks", new int[] { 0x1b, '[', '?', '1', 'h', 0x1b, '=' });
-            define("le", new int[] { CTRL('H') });
-            define("md", new int[] { 0x1b, '[', '1', 'm' });
-            define("me", new int[] { 0x1b, '[', 'm' });
-            define("ml", new int[] { 0x1b, 'l' });
-            define("mr", new int[] { 0x1b, '[', '7', 'm' });
-            define("mu", new int[] { 0x1b, 'm' });
-            define("nd", new int[] { 0x1b, '[', 'C' });
-            define("nw", new int[] { '\r', '\n' });
-            define("rc", new int[] { 0x1b, '8' });
-            define("rs", new int[] { 0x1b, '[', 'm', 0x1b, '?', '7', 'h', 0x1b, '[', '4', 'l', 0x1b, '>', 0x1b, '7', 0x1b, '[', 'r', 0x1b, '[', '1', ';', '3', ';', '4', ';', '6', 'l', 0x1b, '8' });
-            define("sc", new int[] { 0x1b, '7' });
-            define("se", new int[] { 0x1b, '[', 'm' });
-            //define("sf", new int[] { '\n' });
-            define("so", new int[] { 0x1b, '[', '7', 'm' });
-            define("sr", new int[] { 0x1b, 'M' });
-            define("ta", new int[] { CTRL('I') });
-            define("te", new int[] { 0x1b, '[', '2', 'J', 0x1b, '[', '?', '4', '7', 'l', 0x1b, '8' });
-            define("ti", new int[] { 0x1b, '7', 0x1b, '[', '?', '4', '7', 'h' });
-            define("ue", new int[] { 0x1b, '[', 'm' });
-            define("up", new int[] { 0x1b, '[', 'A' });
-            define("us", new int[] { 0x1b, '[', '4', 'm' });
-            define("us", new int[] { 0x1b, '[', '2', '4', 'm' });
-            define("xx", new int[] { 0x1b, '[', '0', 'm' });
+            try {
+                Terminfo info = Terminfo.compile(
+                    "#       Reconstructed via infocmp from file: /usr/share/terminfo/78/xterm\n" +
+                    "xterm|xterm terminal emulator (X Window System),\n" +
+                    "  am, km, mir, msgr, xenl,\n" +
+                    "  cols#80, it#8, lines#24,\n" +
+                    "  acsc=``aaffggiijjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,\n" +
+                    "  bel=^G, bold=\\E[1m, clear=\\E[H\\E[2J, cr=^M,\n" +
+                    "  csr=\\E[%i%p1%d;%p2%dr, cub=\\E[%p1%dD, cub1=^H,\n" +
+                    "  cud=\\E[%p1%dB, cud1=^J, cuf=\\E[%p1%dC, cuf1=\\E[C,\n" +
+                    "  cup=\\E[%i%p1%d;%p2%dH, cuu=\\E[%p1%dA, cuu1=\\E[A,\n" +
+                    "  dch=\\E[%p1%dP, dch1=\\E[P, dl=\\E[%p1%dM, dl1=\\E[M, ed=\\E[J,\n" +
+                    "  el=\\E[K, enacs=\\E)0, .home=\\E[H, ht=^I, hts=\\EH, il=\\E[%p1%dL,\n" +
+                    "  il1=\\E[L, ind=^J,\n" +
+                    "  is2=\\E7\\E[r\\E[m\\E[?7h\\E[?1;3;4;6l\\E[4l\\E8\\E>, kbs=^H,\n" +
+                    "  kcub1=\\EOD, kcud1=\\EOB, kcuf1=\\EOC, kcuu1=\\EOA,\n" +
+                    "  kdch1=\\E[3~, kf1=\\E[11~, kf10=\\E[21~, kf11=\\E[23~,\n" +
+                    "  kf12=\\E[24~, kf13=\\E[25~, kf14=\\E[26~, kf15=\\E[28~,\n" +
+                    "  kf16=\\E[29~, kf17=\\E[31~, kf18=\\E[32~, kf19=\\E[33~,\n" +
+                    "  kf2=\\E[12~, kf20=\\E[34~, kf3=\\E[13~, kf4=\\E[14~,\n" +
+                    "  kf5=\\E[15~, kf6=\\E[17~, kf7=\\E[18~, kf8=\\E[19~, kf9=\\E[20~,\n" +
+                    "  kfnd=\\E[1~, kich1=\\E[2~, kmous=\\E[M, knp=\\E[6~, kpp=\\E[5~,\n" +
+                    "  kslt=\\E[4~, rc=\\E8, rev=\\E[7m, ri=\\EM, rmacs=^O,\n" +
+                    "  rmcup=\\E[2J\\E[?47l\\E8, rmir=\\E[4l, rmkx=\\E[?1l\\E>,\n" +
+                    "  rmso=\\E[m, rmul=\\E[m,\n" +
+                    "  rs2=\\E7\\E[r\\E8\\E[m\\E[?7h\\E[?1;3;4;6l\\E[4l\\E>, sc=\\E7,\n" +
+                    "  sgr0=\\E[m, smacs=^N, smcup=\\E7\\E[?47h, smir=\\E[4h,\n" +
+                    "  smkx=\\E[?1h\\E=, smso=\\E[7m, smul=\\E[4m, tbc=\\E[3g,\n" +
+                    "  u6=\\E[%i%d;%dR, u7=\\E[6n, u8=\\E[?1;2c, u9=\\E[c,\n");
+                for (Capability cap : info.getCapabilities()) {
+                    if (cap.getType() == null) continue;
+                    if (cap.getData() instanceof List) {
+                        List<Integer> list = ((List<Integer>)cap.getData())
+                            .stream()
+                            .filter(i -> {
+                                switch (i) {
+                                case Terminfo.PARAM_I:
+                                case Terminfo.PARAM_P1:
+                                case Terminfo.PARAM_P2:
+                                case Terminfo.PARAM_P3:
+                                case Terminfo.PARAM_P4:
+                                case Terminfo.PARAM_P5:
+                                case Terminfo.PARAM_P6:
+                                case Terminfo.PARAM_P7:
+                                case Terminfo.PARAM_P8:
+                                case Terminfo.PARAM_P9:
+                                    return false;
+                                default:
+                                    return true;
+                                }
+                            })
+                            .collect(Collectors.toList());
+                        int array[] = new int[list.size()];
+                        for (int i = 0; i < list.size(); i++) {
+                            array[i] = list.get(i);
+                        }
+                        define(cap.getType().getCapCode(), array);
+                    }
+                }
+            } catch (TerminfoException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+            
+//            define("AB", new int[] { 0x1b, '4', '8', ';', '5', ';', NUM_PARAM, 'm' });
+//            define("AF", new int[] { 0x1b, '3', '8', ';', '5', ';', NUM_PARAM, 'm' });
+//            define("AL", new int[] { 0x1b, '[', NUM_PARAM, 'L' });
+//            define("DC", new int[] { 0x1b, '[', NUM_PARAM, 'P' });
+//            define("DL", new int[] { 0x1b, '[', NUM_PARAM, 'M' });
+//            define("DO", new int[] { 0x1b, '[', NUM_PARAM, 'B' });
+//            define("LE", new int[] { 0x1b, '[', NUM_PARAM, 'D' });
+//            define("RI", new int[] { 0x1b, '[', NUM_PARAM, 'C' });
+//            define("UP", new int[] { 0x1b, '[', NUM_PARAM, 'A' });
+//            define("ae", new int[] { CTRL('O') });
+//            define("al", new int[] { 0x1b, '[', 'L' });
+//            define("as", new int[] { CTRL('N') });
+//            define("bl", new int[] { CTRL('G') });
+//            define("cd", new int[] { 0x1b, '[', 'J' });
+//            define("ce", new int[] { 0x1b, '[', 'K' });
+//            define("ch", new int[] { 0x1b, '[', NUM_PARAM, 'G' });
+//            define("cl", new int[] { 0x1b, '[', 'H', 0x1b, '[', '2', 'J' });
+//            define("cm", new int[] { 0x1b, '[', NUM_PARAM, ';', NUM_PARAM, 'H' });
+//            define("cr", new int[] { '\r' });
+//            define("cs", new int[] { 0x1b, '[', NUM_PARAM, ';', NUM_PARAM, 'r' });
+//            define("ct", new int[] { 0x1b, '[', '3', 'g' });
+//            define("cv", new int[] { 0x1b, '[', NUM_PARAM, 'd' });
+//            define("dc", new int[] { 0x1b, '[', 'P' });
+//            define("dl", new int[] { 0x1b, '[', 'M' });
+//            define("do", new int[] { '\n' });
+//            define("eA", new int[] { 0x1b, '[', ')', '0' });
+//            define("ei", new int[] { 0x1b, '[', '4', 'l' });
+//            //define("ho", new int[] { 0x1b, '[', 'H' });
+//            define("im", new int[] { 0x1b, '[', '4', 'h' });
+//            //define("kd", new int[] { '\n' });
+//            define("ke", new int[] { 0x1b, '[', '?', '1', 'l', 0x1b, '>' });
+//            define("ks", new int[] { 0x1b, '[', '?', '1', 'h', 0x1b, '=' });
+//            define("le", new int[] { CTRL('H') });
+//            define("md", new int[] { 0x1b, '[', '1', 'm' });
+//            define("me", new int[] { 0x1b, '[', 'm' });
+//            define("ml", new int[] { 0x1b, 'l' });
+//            define("mr", new int[] { 0x1b, '[', '7', 'm' });
+//            define("mu", new int[] { 0x1b, 'm' });
+//            define("nd", new int[] { 0x1b, '[', 'C' });
+//            define("nw", new int[] { '\r', '\n' });
+//            define("rc", new int[] { 0x1b, '8' });
+//            define("rs", new int[] { 0x1b, '[', 'm', 0x1b, '?', '7', 'h', 0x1b, '[', '4', 'l', 0x1b, '>', 0x1b, '7', 0x1b, '[', 'r', 0x1b, '[', '1', ';', '3', ';', '4', ';', '6', 'l', 0x1b, '8' });
+//            define("sc", new int[] { 0x1b, '7' });
+//            define("se", new int[] { 0x1b, '[', 'm' });
+//            //define("sf", new int[] { '\n' });
+//            define("so", new int[] { 0x1b, '[', '7', 'm' });
+//            define("sr", new int[] { 0x1b, 'M' });
+//            define("ta", new int[] { CTRL('I') });
+//            define("te", new int[] { 0x1b, '[', '2', 'J', 0x1b, '[', '?', '4', '7', 'l', 0x1b, '8' });
+//            define("ti", new int[] { 0x1b, '7', 0x1b, '[', '?', '4', '7', 'h' });
+//            define("ue", new int[] { 0x1b, '[', 'm' });
+//            define("up", new int[] { 0x1b, '[', 'A' });
+//            define("us", new int[] { 0x1b, '[', '4', 'm' });
+//            define("us", new int[] { 0x1b, '[', '2', '4', 'm' });
+//            define("xx", new int[] { 0x1b, '[', '0', 'm' });
 
             LOG.debug(this.toString());
         }
@@ -895,7 +960,7 @@ public class Terminal {
                 source.addEdge(edge);
                 define(target, action, Arrays.copyOfRange(seq, 1, seq.length));
 
-                if (event == NUM_PARAM) {
+                if (event == Terminfo.PARAM_D) {
                     edge = new Edge(target, target);
                     edge.setEvent(event);
                     edges.add(edge);
@@ -1154,7 +1219,7 @@ public class Terminal {
             case '\r': return "\\r";
             case '\n': return "\\n";
             case 0x1b: return "ESC";
-            case 0x2FFFF: return "NUM";
+            case Terminfo.PARAM_D: return "NUM";
             default: return String.valueOf((char)c);
             }
         }
@@ -1176,6 +1241,15 @@ public class Terminal {
         }
 
         public Set<String> consume(List<Integer> buffer) throws UnmatchException, IOException {
+//            StringBuffer sb = new StringBuffer();
+//            sb.append("consume(");
+//            String sep = ", ";
+//            for (int c : buffer) {
+//                sb.append(sep + (char)c);
+//                sep = ", ";
+//            }
+//            sb.append(")");
+//            LOG.debug(sb.toString());
             if (buffer.size() == 0) {
                 return actions;
             }
