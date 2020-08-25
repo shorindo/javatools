@@ -793,8 +793,6 @@ public class Terminal {
     private static LinkedList<Integer> params = new LinkedList<>();
 
     public static class Termcap {
-        //private static int INCR_PARAM = 0x1FFFF;
-        //private static int NUM_PARAM = 0x2FFFF;
         private List<Node> nodes;
         private List<Edge> edges;
         private Node start;
@@ -1241,15 +1239,6 @@ public class Terminal {
         }
 
         public Set<String> consume(List<Integer> buffer) throws UnmatchException, IOException {
-//            StringBuffer sb = new StringBuffer();
-//            sb.append("consume(");
-//            String sep = ", ";
-//            for (int c : buffer) {
-//                sb.append(sep + (char)c);
-//                sep = ", ";
-//            }
-//            sb.append(")");
-//            LOG.debug(sb.toString());
             if (buffer.size() == 0) {
                 return actions;
             }
@@ -1259,7 +1248,7 @@ public class Terminal {
                 .filter(e -> {
                     if (c == e.getEvent()) {
                         return true;
-                    } else if ('0' <= c && c <= '9' && e.getEvent() == 0x2FFFF) {
+                    } else if ('0' <= c && c <= '9' && e.getEvent() == Terminfo.PARAM_D) {
                         return true;
                     } else {
                         return false;
@@ -1268,7 +1257,7 @@ public class Terminal {
                 .collect(Collectors.toList());
             List<Integer> subList = buffer.subList(1, buffer.size());
             for (Edge edge : targets) {
-                if (edge.getEvent() == 0x2FFFF) {
+                if (edge.getEvent() == Terminfo.PARAM_D) {
                     numbuffer.add(c);
                 } else if (numbuffer.size() > 0) {
                     int r = 0;
