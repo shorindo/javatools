@@ -43,8 +43,7 @@ import com.shorindo.tools.Terminfo.TerminfoException;
 public class Terminal {
     private static final Logger LOG = Logger.getLogger(Terminal.class);
     private String charset;
-    //private Terminfo terminfo;
-    private TermcapReader termcapReader;
+    private TermReader termReader;
     private OutputStream keyboardOutput;
     private DecoratedCharacter[][] buffer;
     private int rows;
@@ -55,21 +54,16 @@ public class Terminal {
     private Thread thread;
 
     public Terminal(String charset, int cols, int rows) {
-//        try {
-            //this.terminfo = Terminfo.compile("xterm");
-            this.rows = rows;
-            this.cols = cols;
-            this.buffer = new DecoratedCharacter[rows][cols];
-            for (int i = 0; i < rows; i++) {
-                this.buffer[i] = DecoratedCharacter.newArray(cols);
-            }
-            this.charset = charset;
-            this.setIn(System.in);
-            this.setOut(System.out);
-            this.machine = new Termcap(this);
-//        } catch (TerminfoException e) {
-//            LOG.error("initialize error", e);
-//        }
+        this.rows = rows;
+        this.cols = cols;
+        this.buffer = new DecoratedCharacter[rows][cols];
+        for (int i = 0; i < rows; i++) {
+            this.buffer[i] = DecoratedCharacter.newArray(cols);
+        }
+        this.charset = charset;
+        this.setIn(System.in);
+        this.setOut(System.out);
+        this.machine = new Termcap(this);
     }
     
     public void connect(InputStream is, OutputStream os) {
@@ -84,7 +78,7 @@ public class Terminal {
             public void run() {
                 int c;
                 try {
-                    while ((c = termcapReader.read()) != -1) {
+                    while ((c = termReader.read()) != -1) {
                         //LOG.debug("run(" + (char)c + ")");
                         machine.write(c);
                     }
@@ -111,7 +105,7 @@ public class Terminal {
      */
     private void setIn(InputStream is) {
         try {
-            termcapReader = new TermcapReader(new InputStreamReader(is, charset));
+            termReader = new TermReader(new InputStreamReader(is, charset));
         } catch (UnsupportedEncodingException e) {
             LOG.error(e.getMessage(), e);
         }
@@ -792,6 +786,9 @@ public class Terminal {
     private static List<Integer> numbuffer = new ArrayList<>();
     private static LinkedList<Integer> params = new LinkedList<>();
 
+    /**
+     * 
+     */
     public static class Termcap {
         private List<Node> nodes;
         private List<Edge> edges;
@@ -928,9 +925,9 @@ public class Terminal {
             LOG.debug(this.toString());
         }
 
-        private static int CTRL(int c) {
-            return Character.toUpperCase(c) & 63;
-        }
+//        private static int CTRL(int c) {
+//            return Character.toUpperCase(c) & 63;
+//        }
 
         public void define(String action, int[] seq) {
             define(start, action, seq);
@@ -1330,67 +1327,9 @@ public class Terminal {
         }
     }
     
-    public static class TermcapReader extends Reader {
-        private Reader reader;
-        private List<Character> buffer;
-        private int position = 0;
-
-        public TermcapReader(Reader in) {
-            reader = in;
-            buffer = new ArrayList<>();
-        }
-
-        @Override
-        public int read() throws IOException {
-            if (position < buffer.size() - 1) {
-                return buffer.get(position++);
-            } else {
-                int c = reader.read();
-                if (c != -1) {
-                    buffer.add((char)c);
-                    position++;
-                }
-                return c;
-            }
-        }
-
-        @Override
-        public int read(char[] cbuf, int off, int len) throws IOException {
-            int c;
-            int count = 0;
-            while ((c = read()) != -1 && count < len) {
-                cbuf[off++] = (char)c;
-                count++;
-            }
-            return count;
-        }
-
-        @Override
-        public void close() throws IOException {
-            reader.close();
-        }
-        
-        public void reset() {
-            buffer.clear();
-            position = 0;
-        }
-
-        public int position() {
-            return position;
-        }
-
-        public void rewind(int position) {
-            if (position < 0) {
-                this.position = 0;
-            } else if (position >= buffer.size()) {
-                this.position = buffer.size() - 1;
-            } else {
-                this.position = position;
-            }
-        }
-
-    }
-    
+    /**
+     * 
+     */
     public static class KeyboardEvent {
         private KeyboardEventType type;
         private int value;
@@ -1406,18 +1345,30 @@ public class Terminal {
         }
     }
     
+    /**
+     * 
+     */
     public enum KeyboardEventType {
         TYPE
     }
 
+    /**
+     * 
+     */
     public interface KeyboardEventListener {
         public void onEvent(KeyboardEvent event);
     }
 
+    /**
+     * 
+     */
     public interface ScreenEventListener {
         public void onEvent(ScreenEvent event);
     }
 
+    /**
+     * 
+     */
     public class ScreenEvent {
         private ScreenEventType type;
         private List<Integer> params;
@@ -1436,6 +1387,9 @@ public class Terminal {
         }
     }
     
+    /**
+     * 
+     */
     public enum ScreenEventType {
         TC_AL("AL"), TC_DC("DC"), TC_DL("DL"), TC_DO("DO"), TC_LE("LE"), TC_RI("RI"), TC_UP("UP"), TC_ae("ae"),
         TC_al("al"), TC_as("as"), TC_bl("bl"), TC_cd("cd"), TC_ce("ce"), TC_cl("cl"), TC_cm("cm"), TC_cr("cr"),
@@ -1455,6 +1409,9 @@ public class Terminal {
         }
     }
     
+    /**
+     * 
+     */
     public static class DecoratedCharacter {
         private char value;
         private int fontStyle = Font.PLAIN;

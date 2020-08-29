@@ -32,27 +32,87 @@ import com.shorindo.tools.Terminal.ScreenEventListener;
 /**
  * 
  */
-public class TermReader {
-    private PushbackReader pushbackReader;
+public class TermReader extends Reader {
+    private Reader reader;
+    private List<Character> buffer;
+    private int position = 0;
     private State start;
     private State current;
     private List<ScreenEventListener> listeners;
 
     protected TermReader(Reader in) {
-        pushbackReader = new PushbackReader(in);
+        reader = in;
+        buffer = new ArrayList<>();
         listeners = new ArrayList<>();
         start = new State(0);
-    }
-
-    public int read() throws IOException {
-        int c = pushbackReader.read();
-        return c;
     }
 
     public void addScreenEventListener(ScreenEventListener listener) {
         listeners.add(listener);
     }
 
+    @Override
+    public int read() throws IOException {
+        if (position < buffer.size() - 1) {
+            return buffer.get(position++);
+        } else {
+            int c = reader.read();
+            if (c != -1) {
+                buffer.add((char)c);
+                position++;
+            }
+            return c;
+        }
+    }
+
+    @Override
+    public int read(char[] cbuf, int off, int len) throws IOException {
+        int c;
+        int count = 0;
+        while ((c = read()) != -1 && count < len) {
+            cbuf[off++] = (char)c;
+            count++;
+        }
+        return count;
+    }
+
+    @Override
+    public void close() throws IOException {
+        buffer.clear();
+        reader.close();
+    }
+    
+    public int markStart() {
+        buffer.clear();
+        return buffer.size();
+    }
+
+    public void markEnd() {
+        buffer.clear();
+    }
+
+    public void reset() {
+        buffer.clear();
+        position = 0;
+    }
+
+    public int mark() {
+        return position;
+    }
+
+    public void rewind(int position) {
+        if (position < 0) {
+            this.position = 0;
+        } else if (position >= buffer.size()) {
+            this.position = buffer.size() - 1;
+        } else {
+            this.position = position;
+        }
+    }
+
+    /**
+     * 
+     */
     public class State {
         private int id;
         private Set<String> actions;
