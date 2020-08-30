@@ -996,7 +996,7 @@ public class Terminal {
         public void write(int c) {
             buffer.add(c);
             try {
-                Set<String> actions = start.consume(buffer);
+                Set<String> actions = start.accept(buffer);
                 if (actions.size() > 0) {
                     for (String action : actions) {
                         doAction(action);
@@ -1235,7 +1235,7 @@ public class Terminal {
             edges.add(edge);
         }
 
-        public Set<String> consume(List<Integer> buffer) throws UnmatchException, IOException {
+        public Set<String> accept(List<Integer> buffer) throws UnmatchException, IOException {
             if (buffer.size() == 0) {
                 return actions;
             }
@@ -1266,7 +1266,7 @@ public class Terminal {
                 }
                 try {
                     Node next = edge.getTarget();
-                    return next.consume(subList);
+                    return next.accept(subList);
                 } catch(UnmatchException e) {
                     numbuffer.clear();
                     params.clear();

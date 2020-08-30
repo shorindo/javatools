@@ -17,12 +17,14 @@ package com.shorindo.tools;
 
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.sshd.client.SshClient;
 import org.apache.sshd.client.channel.ChannelShell;
 import org.apache.sshd.client.session.ClientSession;
+import org.apache.sshd.common.channel.PtyMode;
 
 import com.shorindo.tools.Logger.Level;
 
@@ -103,6 +105,9 @@ public class TerminalSSH {
             shell.setOut(sout);
             shell.setErr(sout);
             shell.open();
+            for (Entry<PtyMode,Integer> entry : shell.getPtyModes().entrySet()) {
+                LOG.debug(entry.getKey() + " = " + entry.getValue());
+            }
         } catch(Exception e){
             e.printStackTrace();
         }

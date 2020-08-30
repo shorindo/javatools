@@ -32,17 +32,13 @@ import com.shorindo.tools.Terminal.ScreenEventListener;
 /**
  * 
  */
-public class TermReader extends Reader {
-    private Reader reader;
-    private List<Character> buffer;
-    private int position = 0;
+public class TermReader {
+    private BacktrackReader reader;
     private State start;
-    private State current;
     private List<ScreenEventListener> listeners;
 
     protected TermReader(Reader in) {
-        reader = in;
-        buffer = new ArrayList<>();
+        reader = new BacktrackReader(in);
         listeners = new ArrayList<>();
         start = new State(0);
     }
@@ -51,62 +47,66 @@ public class TermReader extends Reader {
         listeners.add(listener);
     }
 
-    @Override
     public int read() throws IOException {
-        if (position < buffer.size() - 1) {
-            return buffer.get(position++);
-        } else {
-            int c = reader.read();
-            if (c != -1) {
-                buffer.add((char)c);
-                position++;
+        //while (start.accept(reader));
+        return reader.read();
+    }
+
+    public static class BacktrackReader extends FilterReader {
+        private List<Integer> buffer;
+        private int pos = -1;
+
+        public BacktrackReader(Reader in) {
+            super(in);
+            buffer = new ArrayList<>();
+        }
+
+        @Override
+        public int read() throws IOException {
+            if (pos == -1) {
+                return super.read();
+            } else if (pos < buffer.size()) {
+                return buffer.get(pos++);
+            } else {
+                int c = super.read();
+                buffer.add(c);
+                pos = buffer.size();
+                return c;
             }
-            return c;
         }
-    }
 
-    @Override
-    public int read(char[] cbuf, int off, int len) throws IOException {
-        int c;
-        int count = 0;
-        while ((c = read()) != -1 && count < len) {
-            cbuf[off++] = (char)c;
-            count++;
+        @Override
+        public int read(char[] cbuf, int off, int len) throws IOException {
+            int count = 0;
+            for (int i = off; i < len; i++) {
+                int c = read();
+                if (c == -1) {
+                    break;
+                } else {
+                    cbuf[i] = (char)c;
+                    count++;
+                }
+            }
+            return count;
         }
-        return count;
-    }
 
-    @Override
-    public void close() throws IOException {
-        buffer.clear();
-        reader.close();
-    }
-    
-    public int markStart() {
-        buffer.clear();
-        return buffer.size();
-    }
+        public int mark() {
+            return pos = buffer.size();
+        }
 
-    public void markEnd() {
-        buffer.clear();
-    }
+        public void rewind(int pos) {
+            if (this.pos == -1) {
+                return;
+            } else if (pos < 0) {
+                pos = 0;
+            } else if (pos < this.pos) {
+                this.pos = pos;
+            }
+        }
 
-    public void reset() {
-        buffer.clear();
-        position = 0;
-    }
-
-    public int mark() {
-        return position;
-    }
-
-    public void rewind(int position) {
-        if (position < 0) {
-            this.position = 0;
-        } else if (position >= buffer.size()) {
-            this.position = buffer.size() - 1;
-        } else {
-            this.position = position;
+        public void reset() {
+            pos = -1;
+            buffer.clear();
         }
     }
 
@@ -135,31 +135,34 @@ public class TermReader extends Reader {
         public Set<String> getActions() {
             return actions;
         }
-        
+
         /*
          * 一直線にたどり着くパターン/分岐のあるパターン
          * 重複のあるパターン
          * 途中で一致しないパターン
          * 最初から一致しないパターン
+         * 
+         * (0) - (1) + (2)
+         *           + (3) + (4)
+         *                 + (5)
          */
-        public void walk(PushbackReader r) throws IOException, UnmatchException {
-            r.mark(10);
+        public boolean accept(BacktrackReader r) throws IOException {
             int c = r.read();
-            State next = null;
             if (targetMap.size() == 0) {
-                // 終端
+                doAction();
+                return true;
             } else if ('0' <= c && c <= '9' && targetMap.containsKey(Terminfo.PARAM_D)) {
-                next = targetMap.get(Terminfo.PARAM_D);
+                boolean b = targetMap.get(Terminfo.PARAM_D).accept(r);
+                return b;
             } else if (targetMap.containsKey(c)) {
-                next = targetMap.get(c);
+                boolean b = targetMap.get(c).accept(r);
+                return b;
             } else {
-                throw new UnmatchException();
+                return false;
             }
-            try {
-                next.walk(r);
-            } catch (UnmatchException e) {
-                r.unread(c);
-            }
+        }
+
+        private void doAction() {
         }
 
         public String toString() {
@@ -197,7 +200,7 @@ public class TermReader extends Reader {
             return "[" + source + ", " + target + "]";
         }
     }
-    
+
     public class UnmatchException extends Exception {
         private static final long serialVersionUID = 1L;
     }
