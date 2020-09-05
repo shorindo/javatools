@@ -13,14 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.shorindo.tools;
+package com.shorindo.terminal;
 
-import static com.shorindo.tools.Terminfo.InfoTypes.*;
+import static com.shorindo.terminal.Terminfo.InfoTypes.*;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import com.shorindo.tools.Logger;
+import com.shorindo.tools.PEGCombinator;
 import com.shorindo.tools.PEGCombinator.PEGContext;
 import com.shorindo.tools.PEGCombinator.PEGException;
 import com.shorindo.tools.PEGCombinator.PEGNode;

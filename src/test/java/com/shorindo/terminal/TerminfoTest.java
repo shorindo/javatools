@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.shorindo.tools;
+package com.shorindo.terminal;
 
 import static org.junit.Assert.*;
 
 import org.junit.Test;
 
-import com.shorindo.tools.Terminfo.Capability;
+import com.shorindo.tools.Logger;
+import com.shorindo.terminal.Terminfo.Capability;
 
 /**
  * 

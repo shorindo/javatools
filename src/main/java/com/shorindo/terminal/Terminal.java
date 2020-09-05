@@ -1,4 +1,4 @@
-package com.shorindo.tools;
+package com.shorindo.terminal;
 
 import java.awt.Canvas;
 import java.awt.Color;
@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.Reader;
 import java.io.UnsupportedEncodingException;
 import java.text.AttributedCharacterIterator;
 import java.text.AttributedCharacterIterator.Attribute;
@@ -37,8 +36,9 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
-import com.shorindo.tools.Terminfo.Capability;
-import com.shorindo.tools.Terminfo.TerminfoException;
+import com.shorindo.terminal.Terminfo.Capability;
+import com.shorindo.terminal.Terminfo.TerminfoException;
+import com.shorindo.tools.Logger;
 
 public class Terminal {
     private static final Logger LOG = Logger.getLogger(Terminal.class);
@@ -79,7 +79,7 @@ public class Terminal {
                 int c;
                 try {
                     while ((c = termReader.read()) != -1) {
-                        //LOG.debug("run(" + (char)c + ")");
+                        LOG.debug("run(" + (char)c + ")");
                         machine.write(c);
                     }
                 } catch (IOException e) {

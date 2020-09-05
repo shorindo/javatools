@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.shorindo.tools;
+package com.shorindo.terminal;
 
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
@@ -26,6 +26,7 @@ import org.apache.sshd.client.channel.ChannelShell;
 import org.apache.sshd.client.session.ClientSession;
 import org.apache.sshd.common.channel.PtyMode;
 
+import com.shorindo.tools.Logger;
 import com.shorindo.tools.Logger.Level;
 
 /**

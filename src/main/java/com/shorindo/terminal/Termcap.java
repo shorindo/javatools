@@ -1,10 +1,8 @@
-package com.shorindo.tools;
+package com.shorindo.terminal;
 
-import java.io.FilterOutputStream;
 import java.io.FilterWriter;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -15,6 +13,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import com.shorindo.tools.Logger;
+import com.shorindo.tools.PEGCombinator;
 
 public class Termcap {
     private static final Logger LOG = Logger.getLogger(Termcap.class);
