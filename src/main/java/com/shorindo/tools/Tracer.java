@@ -121,7 +121,7 @@ public class Tracer {
                         }
                         body.append(newName + "($$);\n");
                         body.append("} finally {");
-                        body.append("    com.shorindo.tools.Profiler.profileOut(profile);");
+                        body.append("    com.shorindo.tools.Tracer.profileOut(profile);");
                         body.append("}}");
                         origMethod.setBody(body.toString());
                     }
