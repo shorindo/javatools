@@ -19,31 +19,25 @@ import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.io.Reader;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Modifier;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Enumeration;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.TreeMap;
+import java.util.Stack;
 import java.util.TreeSet;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
-
-import org.mozilla.javascript.Context;
-import org.mozilla.javascript.Scriptable;
 
 import javassist.CannotCompileException;
 import javassist.ClassPool;
@@ -72,52 +66,69 @@ public class CallGraph {
     private Set<String> excludeSet;
     private PrintWriter nodeWriter;
     private PrintWriter edgeWriter;
+    private GraphData graphData;
 
     public static void main(String[] args) {
         try {
             CallGraph graph = new CallGraph();
-            graph.addPath("C:\\Users\\kazm\\git\\shorindocs\\shorindocs-web\\target\\docs\\WEB-INF\\classes"); 
-            graph.addPath("C:\\Users\\kazm\\git\\shorindocs\\shorindocs-web\\target\\docs\\WEB-INF\\lib\\*");
-            graph.addInclude("com.shorindo.");
-            //graph.addInclude("java.lang.");
-            //graph.addInclude("java.util.function.");
+            //graph.parseArgs(args);
+            //graph.addPath("C:\\Users\\kazm\\git\\shorindocs\\shorindocs-web\\target\\docs\\WEB-INF\\classes"); 
+            //graph.addPath("C:\\Users\\kazm\\git\\shorindocs\\shorindocs-web\\target\\docs\\WEB-INF\\lib\\*");
+            //graph.addInclude("com.shorindo.");
             //graph.addExclude("java.");
             //graph.addExclude("org.");
-            graph.setNodeFile("target/nodes.csv");
-            graph.setEdgeFile("target/edges.csv");
-            graph.create();
+            //graph.setNodeFile("target/nodes.csv");
+            //graph.setEdgeFile("target/edges.csv");
+            graph.create(args);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
     public CallGraph() {
-        cp = ClassPool.getDefault();
+        cp = new ClassPool(false);
         pathSet = new LinkedHashSet<>();
         includeSet = new LinkedHashSet<>();
         excludeSet = new LinkedHashSet<>();
+        graphData = new GraphData();
     }
 
-    protected void execute(File configFile) {
-        Context ctx = Context.enter();
-        try {
-            Reader reader = new FileReader(configFile);
-            Scriptable scope = ctx.initStandardObjects();
-            scope.put("callgraph", scope, this);
-            ctx.evaluateReader(scope, reader, configFile.getName(), 1, null);
-        } catch (Exception e) {
-            LOG.error(e.getMessage(), e);
-        } finally {
-            Context.exit();
-        }
+    private void parseArgs(String[] args) throws Exception {
     }
 
-    private void create() throws Exception {
+    private void usage() {
+    }
+
+    private void create(String[] args) throws Exception {
         //LOG.info("create(" + paths + ")");
         List<File> fileList = new ArrayList<>();
-        for (String path : pathSet) {
-            fileList.addAll(addClassPath(path));
+        Stack<String> stack = new Stack<>();
+
+        for (int i = args.length - 1; i >= 0; i--) {
+            String arg = args[i];
+            switch (arg) {
+            case "--classpath":
+                fileList.addAll(addClassPath(stack.pop()));
+                break;
+            case "--includes":
+                addInclude(stack.pop());
+                break;
+            case "--excludes":
+                addExclude(stack.pop());
+                break;
+            case "--nodes":
+                setNodeFile(stack.pop());
+                break;
+            case "--edges":
+                setEdgeFile(stack.pop());
+                break;
+            default:
+                stack.add(arg);
+            }
         }
+
+        // システムおよび自身のパスは最後にしないと重複するとおかしくなる
+        cp.appendSystemPath();
         for (File file : fileList) {
             walkFile(file);
         }
@@ -132,7 +143,7 @@ public class CallGraph {
             if (file.isDirectory()) {
                 for (File child : file.listFiles()) {
                     if (child.getName().endsWith(".jar")) {
-                        LOG.info("addClassPath(" + child.getAbsolutePath() + ")");
+                        //LOG.info("addClassPath(" + child.getAbsolutePath() + ")");
                         cp.appendClassPath(child.getAbsolutePath());
                         fileList.add(child);
                     }
@@ -160,24 +171,24 @@ public class CallGraph {
         return fileList;
     }
 
-    public void addPath(String path) {
-        pathSet.add(path);
-    }
+//    private void addPath(String path) {
+//        pathSet.add(path);
+//    }
 
-    public void addInclude(String pattern) {
+    private void addInclude(String pattern) {
         includeSet.add(pattern);
     }
 
-    public void addExclude(String pattern) {
+    private void addExclude(String pattern) {
         excludeSet.add(pattern);
     }
 
-    public void setNodeFile(String fileName) throws IOException {
+    private void setNodeFile(String fileName) throws IOException {
         nodeWriter = new PrintWriter(new FileWriter(fileName));
         nodeWriter.println(":ID,shortName,longName,className,methodName");
     }
 
-    public void setEdgeFile(String fileName) throws IOException {
+    private void setEdgeFile(String fileName) throws IOException {
         edgeWriter = new PrintWriter(new FileWriter(fileName));
         edgeWriter.println(":START_ID,:END_ID,:TYPE");
     }
@@ -198,9 +209,7 @@ public class CallGraph {
 
     private void walkJar(File file) throws NotFoundException {
         LOG.info("walkJar(" + file.getName() + ")");
-        //cp.appendClassPath(file.getAbsolutePath());
         try (JarFile jarFile = new JarFile(file)) {
-            //cp.appendClassPath(file.getAbsolutePath());
             for (Enumeration<JarEntry> e = jarFile.entries(); e.hasMoreElements();) {
                 JarEntry entry = e.nextElement();
                 if (entry.getName().endsWith(".class")) {
@@ -208,9 +217,15 @@ public class CallGraph {
                     if (!filter(clazzName)) {
                         continue;
                     }
-                    //LOG.info("walkJar:class=" + clazzName);
                     CtClass cc = cp.get(clazzName);
-                    walkClass(cc);
+                    GraphData graph = analyzeClass(cc);
+                    for (MethodData method : graph.getMethodList()) {
+                        //LOG.info("walkJar -> " + method.getShortName());
+                        printNode(method.getFullName());
+                    }
+                    for (CallData call : graph.getCallList().values()) {
+                        printEdge(call.getCallerName(), call.getCalleeName(), call.getType());
+                    }
                 }
             }
         } catch (Exception e) {
@@ -248,18 +263,38 @@ public class CallGraph {
     }
 
     protected void walkClass(File classFile) throws FileNotFoundException, IOException, NotFoundException, CannotCompileException, BadBytecode {
-        //LOG.info(classFile.getName());
+        LOG.info("walkClass(" + classFile.getName() + ")");
         try (DataInputStream is = new DataInputStream(new FileInputStream(classFile))) {
             ClassFile cf = new ClassFile(is);
             CtClass cc = cp.get(cf.getName());
             if (!filter(cc.getName())) {
                 return;
             }
-            walkClass(cc);
+            //walkClass(cc);
+            GraphData graph = analyzeClass(cc);
+            for (MethodData method : graph.getMethodList()) {
+                //LOG.info("walkClass -> " + method.getShortName());
+                printNode(method.getFullName());
+            }
+            for (CallData call : graph.getCallList().values()) {
+                printEdge(call.getCallerName(), call.getCalleeName(), call.getType());
+            }
         }
     }
 
-    protected void walkClass(CtClass cc) throws CannotCompileException, NotFoundException, BadBytecode {
+    protected GraphData analyzeClass(CtClass cc) throws NotFoundException {
+        GraphData graph = new GraphData();
+
+        // 対象でないクラスを除外
+//        if (!filter(cc.getName())) {
+//            return graph;
+//        }
+        if (cc.getName().equals("java.lang.Object")
+                || cc.getName().equals("java.lang.Class")) {
+            return graph;
+        }
+
+        //LOG.info("analyzeClass(" + cc.getName() + ")");
         BootstrapMethod[] bsms = null;
         for (AttributeInfo attr : cc.getClassFile().getAttributes()) {
             if (attr instanceof BootstrapMethodsAttribute) {
@@ -268,84 +303,86 @@ public class CallGraph {
             }
         }
 
-        Map<String,CtMethod> methodMap = findMethods(cc);
-        for (Entry<String,CtMethod> entry : methodMap.entrySet()) {
-            try {
-                printNode(cc.getName() + "#" + entry.getKey());
-                findCall(bsms, entry.getValue());
-            } catch (Exception e) {
-                LOG.error("walkClass:" + cc.getName() + "#" + entry.getKey());
-                e.printStackTrace();
-            }
-        }
-    }
-
-    protected Map<String,CtMethod> findMethods(CtClass cc) throws CannotCompileException, NotFoundException, BadBytecode {
-        Map<String,CtMethod> methodMap = new TreeMap<>();
-
-        if (!filter(cc.getName())) {
-            return methodMap;
-        }
-
-        //String className = (cc.isInterface() ? "interface " : "class ") + cc.getName();
-        //Set<String> methodSet = new TreeSet<>();
+        // このクラスで定義されたメソッドの解析
         for (CtMethod method : cc.getDeclaredMethods()) {
-            String methodName = method.getName() + method.getSignature();
-            methodMap.put(methodName, method);
-        }
-
-        for (CtClass itfc : cc.getInterfaces()) {
-            for (String methodName : walkInterface(itfc)) {
-                String callerName = itfc.getName() + "#" + methodName;
-                String calleeName = cc.getName() + "#" + methodName;
-                printEdge(callerName, calleeName, RelationType.IMPLEMENT);
-            }
-        }
-
-        for (String methodName : walkSuper(cc.getSuperclass())) {
-            //LOG.info(className + "#" + methodName);
-            //methodSet.add(className + "#" + methodName);
-            String name = methodName.replaceAll("(.*?)\\(.*$", "$1");
-            String desc = methodName.replaceAll(".*?(\\(.*)$", "$1");
             try {
-                CtMethod method = cc.getMethod(name, desc);
-                methodMap.put(methodName, method);
+                String callerName = getMethodName(method); 
+                graph.addMethod(method.getModifiers(), callerName);
+                Map<String, CallData> callMap = findCall(bsms, method);
+                for (Entry<String,CallData> entry : callMap.entrySet()) {
+                    String calleeName = entry.getValue().getCalleeName();
+                    if (!filter(calleeName)) {
+                        continue;
+                    }
+                    if (graphData.getMethodList().contains(calleeName)) {
+                        continue;
+                    }
+                    graph.addCall(new CallData(callerName, calleeName, RelationType.CALL));
+                }
             } catch (Exception e) {
-                e.printStackTrace();
+                LOG.error(e.getMessage(), e);
             }
         }
 
-        return methodMap;
-    }
-
-    private Set<String> walkSuper(CtClass superClass) throws CannotCompileException, NotFoundException {
-        Set<String> methodSet = new TreeSet<>();
-        if (!superClass.isPrimitive()
-                && !superClass.getName().equals("java.lang.Object")
-                && !superClass.getName().equals("java.lang.Class")) {
-            BootstrapMethod[] bsms = null;
-            for (AttributeInfo attr : superClass.getClassFile().getAttributes()) {
-                if (attr instanceof BootstrapMethodsAttribute) {
-                    BootstrapMethodsAttribute bsma = (BootstrapMethodsAttribute)attr;
-                    bsms = bsma.getMethods();
-                }
-            }
-
-            for (CtMethod method : superClass.getDeclaredMethods()) {
-                if (!Modifier.isPrivate(method.getModifiers())) {
-                    String methodName = method.getName() + method.getSignature();
-                    methodSet.add(methodName);
-                    try {
-                        printNode(method.getDeclaringClass() + "#" + method.getLongName() + method.getSignature());
-                        findCall(bsms, method);
-                    } catch (BadBytecode e) {
-                        LOG.error(e.getMessage(), e);
+        // スーパークラスのメソッド継承
+        try {
+            CtClass superClass = cc.getSuperclass();
+//            if (filter(superClass.getName())) {
+                GraphData superData = analyzeClass(superClass);
+                for (MethodData methodData : superData.getMethodList()) {
+                    // このクラスで上書きされたメソッドは継承されない
+                    boolean isPresent = graph.getMethodList()
+                        .stream()
+                        .filter(e -> {
+                            String thisName = methodData.getFullName().replaceAll("^.*?#(.*)$", "$1");
+                            String thatName = e.getFullName().replaceAll("^.*?#(.*)$", "$1");
+                            return thisName.equals(thatName);
+                        })
+                        .findFirst()
+                        .isPresent();
+                    if (!isPresent && !methodData.isPrivate()) {
+                        String callerName = cc.getName() + "#" + methodData.getFullName().replaceAll("^.*?#(.*)$", "$1");
+                        String calleeName = methodData.getFullName();
+                        graph.addMethod(methodData.getModifiers(), callerName);
+                        if (filter(methodData.getClassName())) {
+                            graph.addCall(new CallData(callerName, calleeName, RelationType.INHERIT));
+                        }
                     }
                 }
-            }
-            methodSet.addAll(walkSuper(superClass.getSuperclass()));
+//            }
+        } catch (NotFoundException e) {
+            LOG.error(e.getMessage(), e);
         }
-        return methodSet;
+
+        // インターフェースとの関連付け
+        for (CtClass itfc : cc.getInterfaces()) {
+            GraphData itfcGraph = analyzeClass(itfc);
+            for (MethodData itfcMethod : itfcGraph.getMethodList()) {
+                if (!filter(itfcMethod.getClassName())) {
+                    continue;
+                }
+                String callerName = itfcMethod.getFullName();
+                String calleeName = cc.getName() + "#" + itfcMethod.getFullName().replaceAll("^.*?#(.*)$", "$1");
+                boolean b = graph.getMethodList()
+                    .stream()
+                    .filter(m -> {
+                        //LOG.info(m + " -> " + calleeName);
+                        return m.equals(calleeName);
+                    })
+                    .findFirst()
+                    .isPresent();
+                if (!b) {
+                    graph.addMethod(itfcMethod.getModifiers(), calleeName);
+                }
+                graph.addCall(new CallData(callerName, calleeName, RelationType.IMPLEMENT));
+            }
+        }
+
+        return graph;
+    }
+
+    private String getMethodName(CtMethod method) {
+        return method.getDeclaringClass().getName() + "#" + method.getName() + method.getSignature();
     }
 
     private void printNode(String methodName) {
@@ -354,17 +391,17 @@ public class CallGraph {
         String longName = methodName;
         String className = methodName.replaceAll("^(.*?)#.*$", "$1");
         String mName = methodName.replaceAll("^.*?#([^\\.\\(]+).*$", "$1");
-        nodeWriter.println(hash(methodName) + "," + shortName + "," + longName + "," + className + "," + mName);
+        nodeWriter.println(HASH(methodName) + "," + shortName + "," + longName + "," + className + "," + mName);
     }
 
     private void printEdge(String callerName, String calleeName, RelationType type) {
         //LOG.info("printEdge(" + type.name() + ":" + callerName + " -> " + calleeName + ")");
-        String callerKey = hash(callerName);
-        String calleeKey = hash(calleeName);
+        String callerKey = HASH(callerName);
+        String calleeKey = HASH(calleeName);
         edgeWriter.println(callerKey + "," + calleeKey + "," + type.name());
     }
 
-    private static String hash(String s) throws RuntimeException {
+    private static String HASH(String s) throws RuntimeException {
         try {
             MessageDigest md5 = MessageDigest.getInstance("MD5");
             StringBuffer sb = new StringBuffer();
@@ -403,8 +440,9 @@ public class CallGraph {
             return callMap;
         }
 
+        //LOG.info("CALLER:" + cm.getName());
         String callerName = cm.getDeclaringClass().getName() + "#" + cm.getName() + cm.getSignature();
-        Set<String> calleeSet = new LinkedHashSet<>();
+        Set<String> calleeSet = new TreeSet<>();
         CodeIterator i = code.iterator();
         while (i.hasNext()) {
             int pos = i.next();
@@ -468,49 +506,94 @@ public class CallGraph {
                     desc = pool.getMethodrefType(index);
                 }
 
-                if (!className.startsWith("java.") && !"<init>".equals(methodName)) {
+                if (filter(className) && !"<init>".equals(methodName)) {
                     String calleeName = className + "#" + methodName + desc;
-                    if (!calleeSet.contains(calleeName)) {
-                        calleeSet.add(calleeName);
-                    }
+                    calleeSet.add(calleeName);
                 }
                 break;
             }
         }
 
         for (String calleeName : calleeSet) {
-            printEdge(callerName, calleeName, RelationType.CALL);
+            //LOG.info("\tCALL:" + calleeName);
+            //printEdge(callerName, calleeName, RelationType.CALL);
             CallData call = new CallData(callerName, calleeName, RelationType.CALL);
-            callMap.put(call.getKey(), call);
+            callMap.put(call.getHash(), call);
         }
 
         return callMap;
     }
 
+    private static String shorten(String methodName) {
+        return methodName.replaceAll("^.*?([^\\.]+#[^\\(]+).*$", "$1");
+    }
+
     public static class GraphData {
-        private Map<String,CtMethod> methodSet;
+        private Map<String,MethodData> methodMap;
         private Map<String,CallData> callSet;
 
         public GraphData() {
-            methodSet = new LinkedHashMap<>();
+            methodMap = new LinkedHashMap<>();
             callSet = new LinkedHashMap<>();
         }
 
-        public Map<String, CtMethod> getMethodSet() {
-            return methodSet;
+        public List<MethodData> getMethodList() {
+            return new ArrayList<>(methodMap.values());
         }
 
         public void addMethod(CtMethod method) {
-            String key = hash(method.getDeclaringClass().getName() + "#" + method.getLongName() + method.getSignature());
-            methodSet.put(key, method);
+            addMethod(method.getModifiers(), method.getDeclaringClass().getName() + "#" + method.getName() + method.getSignature());
         }
 
-        public Map<String, CallData> getCallSet() {
+        public void addMethod(int modifiers, String methodName) {
+            MethodData methodData = new MethodData(modifiers, methodName);
+            methodMap.put(methodData.getHash(), methodData);
+        }
+
+        public Map<String, CallData> getCallList() {
             return callSet;
         }
 
-        public void addCall(Map<String, CallData> callSet) {
-            this.callSet = callSet;
+        public void addCall(CallData callData) {
+            callSet.put(callData.getHash(), callData);
+        }
+
+        public void addCall(String callerName, String calleeName, RelationType type) {
+            addCall(new CallData(callerName, calleeName, type));
+        }
+    }
+
+    public static class MethodData {
+        private int modifiers;
+        private String fullName;
+
+        public MethodData(int modifiers, String fullName) {
+            this.modifiers = modifiers;
+            this.fullName = fullName;
+        }
+        public String getFullName() {
+            return fullName;
+        }
+        public String getShortName() {
+            return fullName.replaceAll("^.*?([^\\.]+#[^\\(]+).*$", "$1");
+        }
+        public String getClassName() {
+            return fullName.replaceAll("^([^#]+).*$", "$1");
+        }
+        public String getMethodName() {
+            return fullName.replaceAll("^[^#]+#([^\\(]+).*$", "$1");
+        }
+        public int getModifiers() {
+            return modifiers;
+        }
+        public String getHash() {
+            return HASH(fullName);
+        }
+        public boolean isPrivate() {
+            return Modifier.isPrivate(modifiers);
+        }
+        public String toString() {
+            return getFullName();
         }
     }
 
@@ -524,10 +607,10 @@ public class CallGraph {
             this.callerName = callerName;
             this.calleeName = calleeName;
             this.type = type;
-            this.key = hash(hash(callerName) + hash(calleeName) + hash(type.name()));
+            this.key = HASH(HASH(callerName) + HASH(calleeName) + HASH(type.name()));
         }
 
-        public String getKey() {
+        public String getHash() {
             return key;
         }
 
@@ -541,6 +624,15 @@ public class CallGraph {
 
         public RelationType getType() {
             return type;
+        }
+
+        public String toString() {
+            return type.name() +
+                    " : " +
+                    shorten(callerName) +
+                    " -> " +
+                    shorten(calleeName) +
+                    "]";
         }
     }
 

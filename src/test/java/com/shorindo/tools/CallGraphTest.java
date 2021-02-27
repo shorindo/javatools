@@ -2,115 +2,258 @@ package com.shorindo.tools;
 
 import static org.junit.Assert.*;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.stream.Collectors;
+import java.util.Optional;
 
+import org.junit.BeforeClass;
 import org.junit.Test;
+
+import com.shorindo.tools.CallGraph.CallData;
+import com.shorindo.tools.CallGraph.GraphData;
+import com.shorindo.tools.CallGraph.MethodData;
 
 import javassist.ClassPool;
 import javassist.CtMethod;
 
+/*
+ * interface A extends interface B
+ *     -> A.method IMPLEMENT B.method
+ * abstract class A implements interface B
+ *     -> A.method IMPLEMENT B.method
+ *     -> abstract A.method IMPLEMENT B.method
+ * class A implements interface B
+ *     -> A.method IMPLEMENT B.method
+ * abstract class extends abstract class
+ *     -> A.method IMPLEMENT B.method
+ *     -> abstract A.method IMPLEMENT B.method
+ * abstract class A extends class B
+ *     -> A.method INHERIT B.method
+ * class A implements interface B
+ *     -> A.method IMPLEMENT B.method
+ * class A extends abstract class B
+ *     -> A.method INHERIT B.method
+ *     -> A.method IMPLEMENT B.method
+ * class A extends class B
+ *     -> A.method INHERIT B.method
+ * 
+ *    CALLEE
+ * C+---------------------------------------------------
+ * A|  i a c s l1 l2
+ * L|i I I I I
+ * L|a
+ * E|c
+ * R|s
+ *  |l1
+ *  |l2
+ */
 public class CallGraphTest {
-    private CallGraph graph = new CallGraph();
+    private static CallGraph graph = new CallGraph();
     private ClassPool cp = ClassPool.getDefault();
 
-    private void assertClass(Class<?> clazz) throws Exception {
-        graph.walkClass(cp.get(clazz.getName()));
+    @BeforeClass
+    public static void beforeClass() {
+        graph.addInclude("com.shorindo.");
     }
 
-    /*
-     * メソッド呼び出し
+    private void assertMethod(Class<?> clazz, String shortName) throws Exception {
+        assertMethod(clazz, shortName, true);
+    }
+
+    private void assertNotMethod(Class<?> clazz, String shortName) throws Exception {
+        assertMethod(clazz, shortName, false);
+    }
+
+    private void assertMethod(Class<?> clazz, String shortName, boolean b) throws Exception {
+        Optional<MethodData> result = graph.analyzeClass(cp.get(clazz.getName()))
+                .getMethodList()
+                .stream()
+                .filter(m -> {
+                    //System.out.println(m.getShortName());
+                    return shortName.equals(SHORTEN(m.getFullName()));
+                })
+                .findFirst();
+        if (b && !result.isPresent()) {
+            fail("not found:" + shortName);
+        }
+        if (!b && result.isPresent()) {
+            fail("found:" + shortName);
+        }
+    }
+
+    private void assertCall(Class<?> clazz, String callerName, String calleeName, String typeName) throws Exception {
+        assertCall(clazz, callerName, calleeName, typeName, true);
+    }
+
+    private void assertNotCall(Class<?> clazz, String callerName, String calleeName, String typeName) throws Exception {
+        assertCall(clazz, callerName, calleeName, typeName, false);
+    }
+
+    private void assertCall(Class<?> clazz, String callerName, String calleeName, String typeName, boolean b) throws Exception {
+        Optional<CallData> result = graph.analyzeClass(cp.get(clazz.getName()))
+            .getCallList()
+            .entrySet()
+            .stream()
+            .map(e -> {
+                return e.getValue();
+            })
+            .filter(call -> {
+                //System.out.println(call);
+                return callerName.equals(SHORTEN(call.getCallerName()))
+                        && calleeName.equals(SHORTEN(call.getCalleeName()))
+                        && typeName.equals(call.getType().name());
+            })
+            .findFirst();
+        if (b && !result.isPresent()) {
+            fail("not found edge:" + callerName + ", " + calleeName + ", " + typeName);
+        }
+        if (!b && result.isPresent()) {
+            fail("found edge:" + callerName + ", " + calleeName + ", " + typeName);
+        }
+    }
+
+    private String SHORTEN(String methodName) {
+        return methodName.replaceAll("^.*?([^\\.\\$]+#[^\\(]+).*$", "$1");
+    }
+
+    /**
+     * インターフェース
      */
     @Test
-    public void testC1() throws Exception {
-        assertClass(C1.class);
-    }
+    public void test1() throws Exception {
+        assertMethod(I1.class, "I1#i11");
 
-    public static class C1 {
-        public void c1() {
-            c2();
-            new C2().c2();
-        }
-        public void c2() {
-        }
-    }
-
-    public static class C2 {
-        public void c2() {
-        }
-    }
-
-    /*
-     * インターフェースの実装
-     */
-    @Test
-    public void testI1() throws Exception {
-        assertClass(C3.class);
+        assertMethod(I2.class, "I2#i11");
+        assertMethod(I2.class, "I2#i21");
+        assertCall(I2.class, "I1#i11", "I2#i11", "IMPLEMENT");
     }
 
     public static interface I1 {
-        public String i1(String s);
+        public void i11();
     }
 
-    public static class C3 implements I1 {
+    public static interface I2 extends I1 {
+        public void i21();
+    }
+
+    /**
+     * 抽象クラス
+     */
+    @Test
+    public void test2() throws Exception {
+        assertMethod(A1.class, "A1#i11");
+        assertMethod(A1.class, "A1#a11");
+        assertMethod(A1.class, "A1#a12");
+
+        assertMethod(A2.class, "A2#i11");
+        assertMethod(A2.class, "A2#a11");
+        assertMethod(A2.class, "A2#a12");
+        assertMethod(A2.class, "A2#a21");
+        assertCall(A2.class, "A2#a21", "A2#i11", "CALL");
+    }
+
+    public static abstract class A1 implements I1 {
+        public abstract void a11();
+        public void a12() {
+            i11();
+            a11();
+            a12();
+        }
+    }
+
+    public static class A2 extends A1 {
+        public void i11() {
+        }
         @Override
-        public String i1(String s) {
-            return null;
+        public void a11() {
         }
-
-        public void c3() {
-            i1("c3");
+        public void a21() {
+            i11();
         }
     }
 
-    /*
-     * インターフェース呼び出し
+    /**
+     * クラス
      */
     @Test
-    public void testC4() throws Exception {
-        assertClass(C4.class);
+    public void test3() throws Exception {
+        assertMethod(C1.class, "C1#i11");
+        assertMethod(C1.class, "C1#i21");
+        assertMethod(C1.class, "C1#a11");
+        assertMethod(C1.class, "C1#a12");
+        assertMethod(C1.class, "C1#c11");
+        assertCall(C1.class, "I2#i11", "C1#i11", "IMPLEMENT");
+        assertCall(C1.class, "I2#i21", "C1#i21", "IMPLEMENT");
+        assertCall(C1.class, "C1#c11", "C1#i11", "CALL");
+        assertCall(C1.class, "C1#c11", "C1#a11", "CALL");
+        assertCall(C1.class, "C1#c11", "C1#a12", "CALL");
+        assertCall(C1.class, "C1#c11", "C1#c11", "CALL");
     }
 
-    public static class C4 {
-        public void c4() {
-            I1 i1 = new C3();
-            i1.i1("C3");
-        }
-    }
-
-    /*
-     * 継承メソッド呼び出し
-     */
-    @Test
-    public void testC5() throws Exception {
-        assertClass(C5.class);
-    }
-
-    public static class C5 {
-        public void c5() {
-        }
-    }
-
-    public static class C6 extends C5 {
-    }
-
-    /*
-     * 抽象クラス継承
-     */
-    @Test
-    public void testA1() throws Exception {
-        assertClass(C5.class);
-    }
-
-    public static abstract class A1 {
-        public abstract void a1();
-        public void a2() {
-        }
-    }
-
-    public static class C7 extends A1 {
+    public static class C1 extends A1 implements I2 {
         @Override
-        public void a1() {
+        public void i11() {
         }
+        @Override
+        public void i21() {
+        }
+        @Override
+        public void a11() {
+        }
+        public void c11() {
+            i11();
+            a11();
+            a12();
+            c11();
+        }
+        public void c12() {
+        }
+        private void c13() {
+        }
+    }
+
+    /**
+     * 継承
+     */
+    @Test
+    public void test4() throws Exception {
+        assertMethod(C2.class, "C2#i11");
+        assertMethod(C2.class, "C2#a11");
+        assertMethod(C2.class, "C2#a12");
+        assertMethod(C2.class, "C2#c11");
+        assertMethod(C2.class, "C2#c12");
+        assertMethod(C2.class, "C2#c21");
+        assertNotMethod(C2.class, "C2#c13");
+        assertCall(C2.class, "C2#c11", "C1#c11", "INHERIT");
+        assertCall(C2.class, "C2#a11", "C1#a11", "INHERIT");
+        assertCall(C2.class, "C2#a12", "C1#a12", "INHERIT");
+        assertNotCall(C2.class, "C2#c12", "C1#c12", "INHERIT");
+        assertCall(C2.class, "C2#c21", "C2#c11", "CALL");
+        assertCall(C2.class, "C2#c21", "C2#c12", "CALL");
+    }
+
+    public static class C2 extends C1 {
+        public void c12() {
+        }
+        public void c21() {
+            c11();
+            c12();
+        }
+    }
+
+    /*
+     * 
+     */
+    @Test
+    public void testMain() throws Exception {
+        CallGraph.main(new String[] {
+                "--classpath", "C:\\Users\\kazm\\git\\javatools\\target\\classes", 
+                "--includes", "com.shorindo.tools.CallGraph",
+                "--excludes", "java.",
+                "--nodes", "target/nodes.csv",
+                "--edges", "target/edges.csv"
+        });
     }
 }
