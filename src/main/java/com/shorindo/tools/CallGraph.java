@@ -93,13 +93,7 @@ public class CallGraph {
         graphData = new GraphData();
     }
 
-    private void parseArgs(String[] args) throws Exception {
-    }
-
-    private void usage() {
-    }
-
-    private void create(String[] args) throws Exception {
+    protected void create(String[] args) throws Exception {
         //LOG.info("create(" + paths + ")");
         List<File> fileList = new ArrayList<>();
         Stack<String> stack = new Stack<>();
@@ -136,7 +130,7 @@ public class CallGraph {
         edgeWriter.close();
     }
 
-    private List<File> addClassPath(String fileName) throws NotFoundException {
+    protected List<File> addClassPath(String fileName) throws NotFoundException {
         List<File> fileList = new ArrayList<>();
         if (fileName.endsWith("*")) {
             File file = new File(fileName.substring(0, fileName.length() - 2));
@@ -159,7 +153,7 @@ public class CallGraph {
         return fileList;
     }
 
-    private List<File> findClass(File file) {
+    protected List<File> findClass(File file) {
         List<File> fileList = new ArrayList<>();
         if (file.isDirectory()) {
             for (File child : file.listFiles()) {
@@ -171,24 +165,20 @@ public class CallGraph {
         return fileList;
     }
 
-//    private void addPath(String path) {
-//        pathSet.add(path);
-//    }
-
-    private void addInclude(String pattern) {
+    protected void addInclude(String pattern) {
         includeSet.add(pattern);
     }
 
-    private void addExclude(String pattern) {
+    protected void addExclude(String pattern) {
         excludeSet.add(pattern);
     }
 
-    private void setNodeFile(String fileName) throws IOException {
+    protected void setNodeFile(String fileName) throws IOException {
         nodeWriter = new PrintWriter(new FileWriter(fileName));
         nodeWriter.println(":ID,shortName,longName,className,methodName");
     }
 
-    private void setEdgeFile(String fileName) throws IOException {
+    protected void setEdgeFile(String fileName) throws IOException {
         edgeWriter = new PrintWriter(new FileWriter(fileName));
         edgeWriter.println(":START_ID,:END_ID,:TYPE");
     }

@@ -19,35 +19,7 @@ import javassist.ClassPool;
 import javassist.CtMethod;
 
 /*
- * interface A extends interface B
- *     -> A.method IMPLEMENT B.method
- * abstract class A implements interface B
- *     -> A.method IMPLEMENT B.method
- *     -> abstract A.method IMPLEMENT B.method
- * class A implements interface B
- *     -> A.method IMPLEMENT B.method
- * abstract class extends abstract class
- *     -> A.method IMPLEMENT B.method
- *     -> abstract A.method IMPLEMENT B.method
- * abstract class A extends class B
- *     -> A.method INHERIT B.method
- * class A implements interface B
- *     -> A.method IMPLEMENT B.method
- * class A extends abstract class B
- *     -> A.method INHERIT B.method
- *     -> A.method IMPLEMENT B.method
- * class A extends class B
- *     -> A.method INHERIT B.method
- * 
- *    CALLEE
- * C+---------------------------------------------------
- * A|  i a c s l1 l2
- * L|i I I I I
- * L|a
- * E|c
- * R|s
- *  |l1
- *  |l2
+ *
  */
 public class CallGraphTest {
     private static CallGraph graph = new CallGraph();
