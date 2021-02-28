@@ -2,21 +2,15 @@ package com.shorindo.tools;
 
 import static org.junit.Assert.*;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.stream.Collectors;
 import java.util.Optional;
 
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.shorindo.tools.CallGraph.CallData;
-import com.shorindo.tools.CallGraph.GraphData;
 import com.shorindo.tools.CallGraph.MethodData;
 
 import javassist.ClassPool;
-import javassist.CtMethod;
 
 /*
  *
@@ -213,19 +207,5 @@ public class CallGraphTest {
             c11();
             c12();
         }
-    }
-
-    /*
-     * 
-     */
-    @Test
-    public void testMain() throws Exception {
-        CallGraph.main(new String[] {
-                "--classpath", "C:\\Users\\kazm\\git\\javatools\\target\\classes", 
-                "--includes", "com.shorindo.tools.CallGraph",
-                "--excludes", "java.",
-                "--nodes", "target/nodes.csv",
-                "--edges", "target/edges.csv"
-        });
     }
 }

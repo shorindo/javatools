@@ -71,14 +71,6 @@ public class CallGraph {
     public static void main(String[] args) {
         try {
             CallGraph graph = new CallGraph();
-            //graph.parseArgs(args);
-            //graph.addPath("C:\\Users\\kazm\\git\\shorindocs\\shorindocs-web\\target\\docs\\WEB-INF\\classes"); 
-            //graph.addPath("C:\\Users\\kazm\\git\\shorindocs\\shorindocs-web\\target\\docs\\WEB-INF\\lib\\*");
-            //graph.addInclude("com.shorindo.");
-            //graph.addExclude("java.");
-            //graph.addExclude("org.");
-            //graph.setNodeFile("target/nodes.csv");
-            //graph.setEdgeFile("target/edges.csv");
             graph.create(args);
         } catch (Exception e) {
             e.printStackTrace();
@@ -175,7 +167,7 @@ public class CallGraph {
 
     protected void setNodeFile(String fileName) throws IOException {
         nodeWriter = new PrintWriter(new FileWriter(fileName));
-        nodeWriter.println(":ID,shortName,longName,className,methodName");
+        nodeWriter.println(":ID,methodName,shortName,longName,className");
     }
 
     protected void setEdgeFile(String fileName) throws IOException {
@@ -381,7 +373,7 @@ public class CallGraph {
         String longName = methodName;
         String className = methodName.replaceAll("^(.*?)#.*$", "$1");
         String mName = methodName.replaceAll("^.*?#([^\\.\\(]+).*$", "$1");
-        nodeWriter.println(HASH(methodName) + "," + shortName + "," + longName + "," + className + "," + mName);
+        nodeWriter.println(HASH(methodName) + "," + mName + "," + shortName + "," + longName + "," + className);
     }
 
     private void printEdge(String callerName, String calleeName, RelationType type) {
