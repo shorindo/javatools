@@ -66,7 +66,7 @@ public class CallGraphTest {
                 return e.getValue();
             })
             .filter(call -> {
-                //System.out.println(call);
+                System.out.println(call);
                 return callerName.equals(SHORTEN(call.getCallerName()))
                         && calleeName.equals(SHORTEN(call.getCalleeName()))
                         && typeName.equals(call.getType().name());
@@ -112,12 +112,15 @@ public class CallGraphTest {
         assertMethod(A1.class, "A1#i11");
         assertMethod(A1.class, "A1#a11");
         assertMethod(A1.class, "A1#a12");
+        assertCall(A1.class, "I1#i11", "A1#i11", "IMPLEMENT");
 
         assertMethod(A2.class, "A2#i11");
         assertMethod(A2.class, "A2#a11");
         assertMethod(A2.class, "A2#a12");
         assertMethod(A2.class, "A2#a21");
+        assertCall(A2.class, "A1#i11", "A2#i11", "IMPLEMENT");
         assertCall(A2.class, "A2#a21", "A2#i11", "CALL");
+        assertCall(A2.class, "A1#a11", "A2#a11", "IMPLEMENT");
     }
 
     public static abstract class A1 implements I1 {

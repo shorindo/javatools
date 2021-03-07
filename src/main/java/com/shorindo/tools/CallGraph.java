@@ -33,6 +33,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.Set;
 import java.util.Stack;
 import java.util.TreeSet;
@@ -61,12 +62,10 @@ import javassist.bytecode.Opcode;
 public class CallGraph {
     private static Logger LOG = Logger.getLogger(CallGraph.class);
     private ClassPool cp;
-    private Set<String> pathSet;
     private Set<String> includeSet;
     private Set<String> excludeSet;
     private PrintWriter nodeWriter;
     private PrintWriter edgeWriter;
-    private GraphData graphData;
 
     public static void main(String[] args) {
         try {
@@ -79,10 +78,8 @@ public class CallGraph {
 
     public CallGraph() {
         cp = new ClassPool(false);
-        pathSet = new LinkedHashSet<>();
         includeSet = new LinkedHashSet<>();
         excludeSet = new LinkedHashSet<>();
-        graphData = new GraphData();
     }
 
     protected void create(String[] args) throws Exception {
@@ -167,12 +164,12 @@ public class CallGraph {
 
     protected void setNodeFile(String fileName) throws IOException {
         nodeWriter = new PrintWriter(new FileWriter(fileName));
-        nodeWriter.println(":ID,methodName,shortName,longName,className");
+        nodeWriter.println("key:ID,methodName,shortName,longName,className,modifier,label:LABEL");
     }
 
     protected void setEdgeFile(String fileName) throws IOException {
         edgeWriter = new PrintWriter(new FileWriter(fileName));
-        edgeWriter.println(":START_ID,:END_ID,:TYPE");
+        edgeWriter.println(":START_ID,:END_ID,:TYPE,callerName,calleeName,order");
     }
 
     private void walkFile(File file) throws Exception {
@@ -189,8 +186,9 @@ public class CallGraph {
         }
     }
 
-    private void walkJar(File file) throws NotFoundException {
+    private GraphData walkJar(File file) throws NotFoundException {
         LOG.info("walkJar(" + file.getName() + ")");
+        GraphData graphJar = new GraphData();
         try (JarFile jarFile = new JarFile(file)) {
             for (Enumeration<JarEntry> e = jarFile.entries(); e.hasMoreElements();) {
                 JarEntry entry = e.nextElement();
@@ -202,17 +200,18 @@ public class CallGraph {
                     CtClass cc = cp.get(clazzName);
                     GraphData graph = analyzeClass(cc);
                     for (MethodData method : graph.getMethodList()) {
-                        //LOG.info("walkJar -> " + method.getShortName());
-                        printNode(method.getFullName());
+                        //printNode(method.getFullName());
+                        printNode(method);
                     }
                     for (CallData call : graph.getCallList().values()) {
-                        printEdge(call.getCallerName(), call.getCalleeName(), call.getType());
+                        printEdge(call);
                     }
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
+        return graphJar;
     }
 
     private String path2clazz(String path) {
@@ -256,10 +255,11 @@ public class CallGraph {
             GraphData graph = analyzeClass(cc);
             for (MethodData method : graph.getMethodList()) {
                 //LOG.info("walkClass -> " + method.getShortName());
-                printNode(method.getFullName());
+                //printNode(method.getFullName());
+                printNode(method);
             }
             for (CallData call : graph.getCallList().values()) {
-                printEdge(call.getCallerName(), call.getCalleeName(), call.getType());
+                printEdge(call);
             }
         }
     }
@@ -268,9 +268,6 @@ public class CallGraph {
         GraphData graph = new GraphData();
 
         // 対象でないクラスを除外
-//        if (!filter(cc.getName())) {
-//            return graph;
-//        }
         if (cc.getName().equals("java.lang.Object")
                 || cc.getName().equals("java.lang.Class")) {
             return graph;
@@ -291,15 +288,13 @@ public class CallGraph {
                 String callerName = getMethodName(method); 
                 graph.addMethod(method.getModifiers(), callerName);
                 Map<String, CallData> callMap = findCall(bsms, method);
+                int count = 0;
                 for (Entry<String,CallData> entry : callMap.entrySet()) {
                     String calleeName = entry.getValue().getCalleeName();
                     if (!filter(calleeName)) {
                         continue;
                     }
-                    if (graphData.getMethodList().contains(calleeName)) {
-                        continue;
-                    }
-                    graph.addCall(new CallData(callerName, calleeName, RelationType.CALL));
+                    graph.addCall(callerName, calleeName, RelationType.CALL, ++count);
                 }
             } catch (Exception e) {
                 LOG.error(e.getMessage(), e);
@@ -309,29 +304,34 @@ public class CallGraph {
         // スーパークラスのメソッド継承
         try {
             CtClass superClass = cc.getSuperclass();
-//            if (filter(superClass.getName())) {
-                GraphData superData = analyzeClass(superClass);
-                for (MethodData methodData : superData.getMethodList()) {
-                    // このクラスで上書きされたメソッドは継承されない
-                    boolean isPresent = graph.getMethodList()
+            GraphData superData = analyzeClass(superClass);
+            for (MethodData methodData : superData.getMethodList()) {
+                // このクラスで上書きされたメソッドは継承されない
+                Optional<MethodData> optMethod = graph.getMethodList()
                         .stream()
                         .filter(e -> {
                             String thisName = methodData.getFullName().replaceAll("^.*?#(.*)$", "$1");
                             String thatName = e.getFullName().replaceAll("^.*?#(.*)$", "$1");
                             return thisName.equals(thatName);
                         })
-                        .findFirst()
-                        .isPresent();
-                    if (!isPresent && !methodData.isPrivate()) {
-                        String callerName = cc.getName() + "#" + methodData.getFullName().replaceAll("^.*?#(.*)$", "$1");
-                        String calleeName = methodData.getFullName();
-                        graph.addMethod(methodData.getModifiers(), callerName);
+                        .findFirst();
+                if (optMethod.isPresent()) {
+                    if (Modifier.isAbstract(methodData.getModifiers())) {
+                        String callerName = methodData.getFullName();
+                        String calleeName = cc.getName() + "#" + methodData.getFullName().replaceAll("^.*?#(.*)$", "$1");
                         if (filter(methodData.getClassName())) {
-                            graph.addCall(new CallData(callerName, calleeName, RelationType.INHERIT));
+                            graph.addCall(callerName, calleeName, RelationType.IMPLEMENT, 1);
                         }
                     }
+                } else if (!methodData.isPrivate()) {
+                    String callerName = cc.getName() + "#" + methodData.getFullName().replaceAll("^.*?#(.*)$", "$1");
+                    String calleeName = methodData.getFullName();
+                    graph.addMethod(methodData.getModifiers(), callerName);
+                    if (filter(methodData.getClassName())) {
+                        graph.addCall(callerName, calleeName, RelationType.INHERIT, 1);
+                    }
                 }
-//            }
+            }
         } catch (NotFoundException e) {
             LOG.error(e.getMessage(), e);
         }
@@ -356,7 +356,9 @@ public class CallGraph {
                 if (!b) {
                     graph.addMethod(itfcMethod.getModifiers(), calleeName);
                 }
-                graph.addCall(new CallData(callerName, calleeName, RelationType.IMPLEMENT));
+                if (filter(itfcMethod.getClassName())) {
+                    graph.addCall(callerName, calleeName, RelationType.IMPLEMENT, 1);
+                }
             }
         }
 
@@ -367,20 +369,43 @@ public class CallGraph {
         return method.getDeclaringClass().getName() + "#" + method.getName() + method.getSignature();
     }
 
-    private void printNode(String methodName) {
-        //LOG.info("printNode(" + methodName + ")");
-        String shortName = methodName.replaceAll("^.*?\\.([^\\.]+#[^\\.\\(]+).*$", "$1");
-        String longName = methodName;
-        String className = methodName.replaceAll("^(.*?)#.*$", "$1");
-        String mName = methodName.replaceAll("^.*?#([^\\.\\(]+).*$", "$1");
-        nodeWriter.println(HASH(methodName) + "," + mName + "," + shortName + "," + longName + "," + className);
+    private void printNode(MethodData method) {
+        // key:ID,methodName,shortName,longName,className,modifier,label:LABEL
+        nodeWriter.println(
+                method.getHash()
+                + "," + method.getMethodName()
+                + "," + method.getShortName()
+                + "," + method.getFullName()
+                + "," + method.getClassName()
+                + "," + method.getModifiers()
+                + "," + method.getShortName());
     }
 
-    private void printEdge(String callerName, String calleeName, RelationType type) {
+//    private void printNode(String methodName) {
+//        //LOG.info("printNode(" + methodName + ")");
+//        String shortName = methodName.replaceAll("^.*?\\.([^\\.]+#[^\\.\\(]+).*$", "$1");
+//        String longName = methodName;
+//        String className = methodName.replaceAll("^(.*?)#.*$", "$1");
+//        String mName = methodName.replaceAll("^.*?#([^\\.\\(]+).*$", "$1");
+//        nodeWriter.println(
+//                HASH(methodName) + 
+//                "," + mName + 
+//                "," + shortName + 
+//                "," + longName + 
+//                "," + className + 
+//                "," + shortName);
+//    }
+
+    private void printEdge(CallData callData) {
         //LOG.info("printEdge(" + type.name() + ":" + callerName + " -> " + calleeName + ")");
-        String callerKey = HASH(callerName);
-        String calleeKey = HASH(calleeName);
-        edgeWriter.println(callerKey + "," + calleeKey + "," + type.name());
+        String callerKey = HASH(callData.getCallerName());
+        String calleeKey = HASH(callData.getCalleeName());
+        edgeWriter.println(callerKey +
+                    "," + calleeKey +
+                    "," + callData.getType().name() +
+                    "," + SHORTEN(callData.getCallerName()) +
+                    "," + SHORTEN(callData.getCalleeName()) +
+                    "," + callData.getOrder());
     }
 
     private static String HASH(String s) throws RuntimeException {
@@ -411,8 +436,9 @@ public class CallGraph {
 
     /**
      * 参考：https://hidekatsu-izuno.hatenablog.com/entry/2020/06/08/235553
+     * @throws NotFoundException 
      */
-    private Map<String,CallData> findCall(BootstrapMethod[] bsms, CtMethod cm) throws BadBytecode {
+    private Map<String,CallData> findCall(BootstrapMethod[] bsms, CtMethod cm) throws BadBytecode, NotFoundException {
         Map<String,CallData> callMap = new LinkedHashMap<>();
         MethodInfo info = cm.getMethodInfo2();
         ConstPool pool = info.getConstPool();
@@ -424,7 +450,7 @@ public class CallGraph {
 
         //LOG.info("CALLER:" + cm.getName());
         String callerName = cm.getDeclaringClass().getName() + "#" + cm.getName() + cm.getSignature();
-        Set<String> calleeSet = new TreeSet<>();
+        Set<String> calleeSet = new LinkedHashSet<>();
         CodeIterator i = code.iterator();
         while (i.hasNext()) {
             int pos = i.next();
@@ -462,51 +488,68 @@ public class CallGraph {
             }
 
             switch (opecode) {
+            case Opcode.NEW:
+                {
+                    int index = i.u16bitAt(pos + 1);
+                    String className = pool.getClassInfo(index);
+                    if (filter(className)) { 
+                        LOG.info("NEW " + className);
+                    }
+                }
+                break;
+
             case Opcode.INVOKEVIRTUAL:
             case Opcode.INVOKESPECIAL:
             case Opcode.INVOKESTATIC:
             case Opcode.INVOKEINTERFACE:
-                int index = dynIndex == -1 ? i.u16bitAt(pos + 1) : dynIndex;
-                String className;
-                if (opecode == Opcode.INVOKEINTERFACE) {
-                    className = pool.getInterfaceMethodrefClassName(index);
-                } else {
-                    className = pool.getMethodrefClassName(index);
-                }
+                {
+                    int index = dynIndex == -1 ? i.u16bitAt(pos + 1) : dynIndex;
+                    String className;
+                    if (opecode == Opcode.INVOKEINTERFACE) {
+                        className = pool.getInterfaceMethodrefClassName(index);
+                    } else {
+                        className = pool.getMethodrefClassName(index);
+                    }
 
-                String methodName;
-                if (opecode == Opcode.INVOKEINTERFACE) {
-                    methodName = pool.getInterfaceMethodrefName(index);
-                } else {
-                    methodName = pool.getMethodrefName(index);
-                }
+                    String methodName;
+                    if (opecode == Opcode.INVOKEINTERFACE) {
+                        methodName = pool.getInterfaceMethodrefName(index);
+                    } else {
+                        methodName = pool.getMethodrefName(index);
+                    }
 
-                String desc;
-                if (opecode == Opcode.INVOKEINTERFACE) {
-                    desc = pool.getInterfaceMethodrefType(index);
-                } else {
-                    desc = pool.getMethodrefType(index);
-                }
+                    String desc;
+                    if (opecode == Opcode.INVOKEINTERFACE) {
+                        desc = pool.getInterfaceMethodrefType(index);
+                    } else {
+                        desc = pool.getMethodrefType(index);
+                    }
 
-                if (filter(className) && !"<init>".equals(methodName)) {
-                    String calleeName = className + "#" + methodName + desc;
-                    calleeSet.add(calleeName);
+                    if (filter(className) && "<init>".equals(methodName)) {
+                        String calleeName = className + "#" + methodName + desc;
+                        LOG.info("new " + calleeName);
+                    }
+                    if (filter(className) && !"<init>".equals(methodName)) {
+                        String calleeName = className + "#" + methodName + desc;
+                        calleeSet.add(calleeName);
+                    }
                 }
                 break;
             }
         }
 
+        int count = 0;
         for (String calleeName : calleeSet) {
             //LOG.info("\tCALL:" + calleeName);
             //printEdge(callerName, calleeName, RelationType.CALL);
-            CallData call = new CallData(callerName, calleeName, RelationType.CALL);
+            CallData call = new CallData(callerName, calleeName, RelationType.CALL, ++count);
             callMap.put(call.getHash(), call);
         }
 
         return callMap;
     }
 
-    private static String shorten(String methodName) {
+    private static String SHORTEN(String methodName) {
         return methodName.replaceAll("^.*?([^\\.]+#[^\\(]+).*$", "$1");
     }
 
@@ -536,13 +579,11 @@ public class CallGraph {
             return callSet;
         }
 
-        public void addCall(CallData callData) {
+        public void addCall(String callerName, String calleeName, RelationType type, int order) {
+            CallData callData = new CallData(callerName, calleeName, type, order);
             callSet.put(callData.getHash(), callData);
         }
 
-        public void addCall(String callerName, String calleeName, RelationType type) {
-            addCall(new CallData(callerName, calleeName, type));
-        }
     }
 
     public static class MethodData {
@@ -583,12 +624,14 @@ public class CallGraph {
         private String callerName;
         private String calleeName;
         private RelationType type;
+        private int order;
         private String key;
 
-        public CallData(String callerName, String calleeName, RelationType type) {
+        public CallData(String callerName, String calleeName, RelationType type, int order) {
             this.callerName = callerName;
             this.calleeName = calleeName;
             this.type = type;
+            this.order = order;
             this.key = HASH(HASH(callerName) + HASH(calleeName) + HASH(type.name()));
         }
 
@@ -608,13 +651,18 @@ public class CallGraph {
             return type;
         }
 
+        public int getOrder() {
+            return order;
+        }
+
         public String toString() {
             return type.name() +
-                    " : " +
-                    shorten(callerName) +
-                    " -> " +
-                    shorten(calleeName) +
-                    "]";
+                    "," +
+                    SHORTEN(callerName) +
+                    "," +
+                    SHORTEN(calleeName) +
+                    "," +
+                    order;
         }
     }
 
