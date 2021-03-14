@@ -59,7 +59,7 @@ public class CallGraphTest {
 
     private void assertCall(Class<?> clazz, String callerName, String calleeName, String typeName, boolean b) throws Exception {
         Optional<CallData> result = graph.analyzeClass(cp.get(clazz.getName()))
-            .getCallList()
+            .getCallMap()
             .entrySet()
             .stream()
             .map(e -> {
