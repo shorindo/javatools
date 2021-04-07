@@ -1,15 +1,11 @@
 package com.shorindo.tools;
 
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
-import java.io.UnsupportedEncodingException;
-import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -73,6 +69,8 @@ public class GraphAnalyzer {
                     printer = output.endsWith(".html") ?
                             new HtmlPrinter(output) : new TextPrinter(output);
                     break;
+                case "-depth":
+                case "-start":
                 default:
                     //ERROR
                 }
@@ -264,28 +262,28 @@ public class GraphAnalyzer {
         }
     }
 
-    public static class Relation {
-        private int start;
-        private int end;
-        private String type;
-        private int order;
-
-        public Relation(Relationship r) {
-            r.get("properties").asMap().get("order");
-        }
-        public int getStart() {
-            return start;
-        }
-        public int getEnd() {
-            return end;
-        }
-        public String getType() {
-            return type;
-        }
-        public int getOrder() {
-            return order;
-        }
-    }
+//    public static class Relation {
+//        private int start;
+//        private int end;
+//        private String type;
+//        private int order;
+//
+//        public Relation(Relationship r) {
+//            r.get("properties").asMap().get("order");
+//        }
+//        public int getStart() {
+//            return start;
+//        }
+//        public int getEnd() {
+//            return end;
+//        }
+//        public String getType() {
+//            return type;
+//        }
+//        public int getOrder() {
+//            return order;
+//        }
+//    }
 
     public enum PrintMode {
         TEXT, HTML;

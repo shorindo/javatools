@@ -48,9 +48,9 @@ public class ClipboardWatcher extends Thread implements ClipboardOwner {
     }
     
     void processContents(Transferable t) {
-//        for (DataFlavor flavor : t.getTransferDataFlavors()) {
-//            System.out.println(flavor);
-//        }
+        for (DataFlavor flavor : t.getTransferDataFlavors()) {
+            System.out.println(flavor);
+        }
         if (t.isDataFlavorSupported(DataFlavor.stringFlavor)) {
             try {
                 String text = (String)t.getTransferData(DataFlavor.stringFlavor);
