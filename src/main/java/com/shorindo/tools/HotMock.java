@@ -7,8 +7,11 @@ import java.io.Reader;
 import java.lang.reflect.Modifier;
 
 import org.mozilla.javascript.Context;
+import org.mozilla.javascript.ContextFactory;
 import org.mozilla.javascript.NativeJavaObject;
+import org.mozilla.javascript.Scriptable;
 import org.mozilla.javascript.ScriptableObject;
+import org.mozilla.javascript.tools.shell.Global;
 
 import javassist.ClassPool;
 import javassist.CtClass;
@@ -67,9 +70,11 @@ public class HotMock {
 			while ((len = reader.read(buff)) > 0) {
 				source.append(buff, 0, len);
 			}
-			Context ctx = Context.enter();
-			ScriptableObject scope = ctx.initSafeStandardObjects();
-			scope.defineProperty("$ARGS", args, ScriptableObject.READONLY);
+			Context ctx = ContextFactory.getGlobal().enterContext();
+			Global global = new Global();
+			global.init(ctx);
+			global.defineProperty("$ARGS", args, ScriptableObject.READONLY);
+			Scriptable scope = ctx.initSafeStandardObjects(global);
 			result = ctx.evaluateString(scope, source.toString(), file.getName(), 1, null);
 			if (result instanceof NativeJavaObject) {
 				result = ((NativeJavaObject)result).unwrap();
