@@ -6,11 +6,15 @@ public class MockerTarget {
 		System.out.println(new MockerTarget().methodB(args[0]));
 	}
 
-	public String methodA(String input) {
-		return "methodA - " + input;
+	public String methodA(String a) {
+		return "methodA(" + a + ")";
 	}
 
-	public String methodB(String input) {
-		return "methodB - " + input;
+	public String methodA(String a, String b) {
+		return "methodA(" + a + ", " + b + ")";
+	}
+
+	public String methodB(String a) {
+		return "methodB(" + a + ")";
 	}
 }

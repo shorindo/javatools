@@ -15,12 +15,13 @@ public class MockerTest {
 	public static void beforeClass() {
 		HotMock.mock("com.shorindo.tools.MockerTarget",
 				new MockMethod("methodA", new File("src/test/resources", "mock.js")),
-				new MockMethod("methodB", new File("src/test/resources", "mock.jsx")));
+				new MockMethod("methodB", new File("src/test/resources", "mock.js")));
 	}
 
 	@Test
 	public void test() {
 		System.out.println("result = " + new com.shorindo.tools.MockerTarget().methodA("bar"));
-		System.out.println("result = " + new com.shorindo.tools.MockerTarget().methodB("bar"));
+		System.out.println("result = " + new com.shorindo.tools.MockerTarget().methodA("foo", "bar"));
+		System.out.println("result = " + new com.shorindo.tools.MockerTarget().methodB("baz"));
 	}
 }
